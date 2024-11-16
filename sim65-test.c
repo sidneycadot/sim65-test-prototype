@@ -227,9 +227,27 @@ int process_testcase_file(char * filename)
 
 int main(int argc, char ** argv)
 {
+
+    if (argc == 1)
+    {
+        puts("Usage: sim65-test [FILE]...");
+        puts("");
+        puts("Test the instruction execution code from sim65 using JSON-formatted testcases.");
+        puts("");
+        puts("Each FILE should be a JSON-formatted file specifying single-instruction testcases,");
+        puts("formatted according to the conventions used in the 65x02 project.");
+        puts("");
+        puts("The precise JSON format specification, as welll as a large corpus of testcases,");
+        puts("can be obtained from the 65x02 project:");
+        puts("");
+        puts("  https://github.com/SingleStepTests/65x02");
+        puts("");
+    }
+
     for (int i = 1; i < argc; ++i)
     {
         process_testcase_file(argv[i]);
     }
+
     return 0;
 }
