@@ -260,11 +260,11 @@ int main(int argc, char ** argv)
         {
             cpu_mode = SIM65_CPU_6502;
         }
-        else if (strcmp(argv[i], "--cpu-mode=6502") == 0)
+        else if (strcmp(argv[i], "--cpu-mode=65c02") == 0)
         {
             cpu_mode = SIM65_CPU_65C02;
         }
-        else if (strcmp(argv[i], "--cpu-mode=6502") == 0)
+        else if (strcmp(argv[i], "--cpu-mode=6502x") == 0)
         {
             cpu_mode = SIM65_CPU_6502X;
         }
