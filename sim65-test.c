@@ -1,118 +1,14 @@
 
+//////////////////
+// sim65-test.c //
+//////////////////
+
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
 #include <string.h>
 
-#include "6502.h"
-#include "memory.h"
-
 #include "cJSON.h"
-
-unsigned long long TotalCycles;
-extern CPURegs Regs;
-
-struct machine_state_type
-{
-    unsigned pc;
-    unsigned s;
-    unsigned a;
-    unsigned x;
-    unsigned y;
-    unsigned p;
-    unsigned char ram[0x10000];
-};
-
-struct testcase_spec
-{
-    char * name;
-    struct machine_state_type initial_state;
-    struct machine_state_type final_state;
-    unsigned cycles;
-};
-
-int execute_testcase(const char *filename, struct testcase_spec * testcase)
-{
-    // Initialize the sim65 state from the "initial" state.
-
-    CPU = CPU_6502;
-
-    Regs.AC = testcase->initial_state.a;
-    Regs.XR = testcase->initial_state.x;
-    Regs.YR = testcase->initial_state.y;
-    Regs.ZR = 0;
-    Regs.SR = testcase->initial_state.p;
-    Regs.SP = testcase->initial_state.s;
-    Regs.SP = testcase->initial_state.s;
-    Regs.PC = testcase->initial_state.pc;
-
-    memcpy(Mem, testcase->initial_state.ram, 0x10000);
-
-    // Run a single instruction.
-    TotalCycles = 0;
-    unsigned cyclecount = ExecuteInsn();
-
-    // Verify state of CPU and memory and cycle count.
-
-    unsigned errors = 0;
-
-    if (testcase->final_state.a != Regs.AC)
-    {
-        printf("[%s:%s] ERROR - A register check failed (expected: 0x%02x, sim65: 0x%02x).\n", filename, testcase->name, testcase->final_state.a, Regs.AC);
-        ++errors;
-    }
-
-    if (testcase->final_state.x != Regs.XR)
-    {
-        printf("[%s:%s] ERROR - X register check failed (expected: 0x%02x, sim65: 0x%02x).\n", filename, testcase->name, testcase->final_state.a, Regs.XR);
-        ++errors;
-    }
-
-    if (testcase->final_state.y != Regs.YR)
-    {
-        printf("[%s:%s] ERROR - Y register check failed (expected: 0x%02x, sim65: 0x%02x).\n", filename, testcase->name, testcase->final_state.a, Regs.YR);
-        ++errors;
-    }
-
-    if (testcase->final_state.p != Regs.SR)
-    {
-        printf("[%s:%s] ERROR - P register check failed (expected: 0x%02x, sim65: 0x%02x).\n", filename, testcase->name, testcase->final_state.p, Regs.SR);
-        ++errors;
-    }
-
-    if (testcase->final_state.s != Regs.SP)
-    {
-        printf("[%s:%s] ERROR - S register check failed (expected: 0x%02x, sim65: 0x%02x).\n", filename, testcase->name, testcase->final_state.s, Regs.SP);
-        ++errors;
-    }
-
-    if (testcase->final_state.pc != Regs.PC)
-    {
-        printf("[%s:%s] ERROR - PC register check failed (expected: 0x%04x, sim65: 0x%04x).\n", filename, testcase->name, testcase->final_state.s, Regs.PC);
-        ++errors;
-    }
-
-    if (testcase->cycles != cyclecount)
-    {
-        printf("[%s:%s] ERROR - cycle count check failed (expected: %u, sim65: %u).\n", filename, testcase->name, testcase->cycles, cyclecount);
-        ++errors;
-    }
-
-    if (memcmp(testcase->final_state.ram, Mem, 0x10000) != 0)
-    {
-        printf("[%s:%s] ERROR - memory check failed.\n", filename, testcase->name);
-        ++errors;
-    }
-
-    if (errors == 0)
-    {
-        printf("[%s:%s] SUCCESS.\n", filename, testcase->name);
-    }
-
-    return 0;
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#include "sim65-testcase.h"
 
 static int parse_json_ranged_unsigned_number_field(cJSON * json_object, char * field_name, unsigned max_unsigned_value, unsigned * value)
 {
@@ -163,7 +59,10 @@ int parse_json_machine_state_field(cJSON * json_testcase, char * field_name, str
         return -1;
     }
 
+    // Initialize RAM to zero.
     memset(state->ram, 0, 0x10000);
+
+    // Perform the assignments specified in the JSON file.
     for (cJSON * assignment = ramspec->child; assignment != NULL; assignment = assignment->next)
     {
         if (!cJSON_IsArray(assignment))
@@ -193,7 +92,7 @@ int parse_json_machine_state_field(cJSON * json_testcase, char * field_name, str
     return 0;
 }
 
-int parse_json_testcase(cJSON * json_testcase, struct testcase_spec * testcase)
+int parse_json_testcase(cJSON * json_testcase, struct sim65_testcase_specification_type * testcase)
 {
     if (!cJSON_IsObject(json_testcase))
     {
@@ -227,20 +126,32 @@ int process_json_testcase_array(const char * filename, cJSON * json_testcase_arr
         return -1; // We expect an array.
     }
 
+    unsigned testcase_index = 0; // First testcase will be 1, and so on.
+    unsigned testcase_error = 0;
+
     for (cJSON * json_testcase = json_testcase_array->child; json_testcase != NULL; json_testcase = json_testcase->next)
     {
-        struct testcase_spec testcase;
+        ++testcase_index;
+
+        struct sim65_testcase_specification_type testcase;
 
         int result = parse_json_testcase(json_testcase, &testcase);
         if (result != 0)
         {
-            printf("[%s] ERROR: cannot parse testcase.\n", filename);
+            printf("[%s:%u] ERROR: Testcase cannot be parsed.\n", filename, testcase_index);
         }
         else
         {
-            execute_testcase(filename, &testcase);
+            int testcase_result = execute_testcase(&testcase, filename, testcase_index);
+            if (testcase_result != 0)
+            {
+                ++testcase_error;
+            }
         }
     }
+
+    printf("[%s] INFO - Test file summary: %u of %u testcases show deviations from expected behavior.\n",
+           filename, testcase_error, testcase_index);
 
     return 0;
 }
@@ -318,7 +229,6 @@ int main(int argc, char ** argv)
 {
     for (int i = 1; i < argc; ++i)
     {
-        printf("testcase file: \"%s\"\n", argv[i]);
         process_testcase_file(argv[i]);
     }
     return 0;

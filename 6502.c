@@ -391,16 +391,16 @@ CPUType CPU;
 typedef void (*OPFunc) (void);
 
 /* The CPU registers */
-CPURegs Regs;
+static CPURegs Regs;
 
 /* Cycles for the current insn */
 static unsigned Cycles;
 
 /* NMI request active */
-unsigned HaveNMIRequest;
+static unsigned HaveNMIRequest;
 
 /* IRQ request active */
-unsigned HaveIRQRequest;
+static unsigned HaveIRQRequest;
 
 
 /*****************************************************************************/
@@ -4090,6 +4090,7 @@ void Reset (void)
     Regs.SR = 0x30;
     Regs.PC = MemReadWord (0xFFFC);
 }
+
 
 
 unsigned ExecuteInsn (void)

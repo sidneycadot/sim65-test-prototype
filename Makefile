@@ -3,6 +3,7 @@
 
 CFLAGS = -W -Wall -O3
 
-sim65_test : sim65_test.c cJSON.c 6502.c memory.c error.c
+sim65-test : sim65-test.c cJSON.c sim65-testcase.c 6502.c
+
 clean :
-	$(RM) *~ sim65_test
+	$(RM) *~ sim65-test
