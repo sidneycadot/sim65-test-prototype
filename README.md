@@ -73,7 +73,6 @@ of '6502.c' and '6502.h' as found in cc65/src/sim65.
 Status and future development
 -----------------------------
 
-For now, this is a prototype. If this is deemed useful enough, I will open an issue on the cc65 Github issue
-tracker to see if we can somehow integrate this into the cc65 project.
-
-But it's also fine to keep this as a seperate project as far as I am concerned.
+For now, this is a prototype. I have opened an Issue on the cc65 issue tracker (https://github.com/cc65/cc65/issues/2539)
+to discuss how we're going to deal with the issues exposed by sim65-test, and also whether to integrate this code into
+the cc65 repository in one way or another.
