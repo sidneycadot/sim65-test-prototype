@@ -87,9 +87,31 @@ void Warning (const char *, ...)
     sim65_reported_warning = true;
 }
 
-int execute_testcase(struct sim65_testcase_specification_type * testcase, const char * filename, unsigned testcase_index)
+int execute_testcase(struct sim65_testcase_specification_type * testcase, const char * filename, unsigned testcase_index, enum sim65_cpu_mode_type cpu_mode)
 {
-    CPU = CPU_6502;
+    switch (cpu_mode)
+    {
+        case SIM65_CPU_6502:
+        {
+            CPU = CPU_6502;
+            break;
+        }
+        case SIM65_CPU_65C02:
+        {
+            CPU = CPU_65C02;
+            break;
+        }
+        case SIM65_CPU_6502X:
+        {
+            CPU = CPU_6502X;
+            break;
+        }
+        default:
+        {
+            // Bad CPU mode.
+            assert(false);
+        }
+    }
 
     // Set the RESET vector, with a preceding JMP instruction.
 
@@ -111,7 +133,7 @@ int execute_testcase(struct sim65_testcase_specification_type * testcase, const 
     sim65_reported_error = false;
     sim65_reported_warning = false;
 
-    ExecuteInsn();
+    ExecuteInsn(); // Execute the single JMP instruction.
 
     assert(sim65_mem_write_byte_address_violation == false);
     assert(sim65_mem_read_byte_address_violation == false);

@@ -6,14 +6,6 @@
 #ifndef SIM65_TESTCASE_H
 #define SIM65_TESTCASE_H
 
-//#include <stdio.h>
-//#include <stdlib.h>
-//#include <assert.h>
-//#include <string.h>
-
-//#include "6502.h"
-//#include "memory.h"
-
 struct machine_state_type
 {
     unsigned pc;
@@ -33,6 +25,12 @@ struct sim65_testcase_specification_type
     unsigned cycles;
 };
 
-int execute_testcase(struct sim65_testcase_specification_type * testcase, const char * filename, unsigned testcase_index);
+enum sim65_cpu_mode_type {
+    SIM65_CPU_6502,
+    SIM65_CPU_65C02,
+    SIM65_CPU_6502X
+};
+
+int execute_testcase(struct sim65_testcase_specification_type * testcase, const char * filename, unsigned testcase_index, enum sim65_cpu_mode_type cpu_mode);
 
 #endif

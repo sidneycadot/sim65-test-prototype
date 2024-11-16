@@ -34,7 +34,7 @@ static int parse_json_ranged_unsigned_number_field(cJSON * json_object, char * f
     return 0; // Success.
 }
 
-int parse_json_machine_state_field(cJSON * json_testcase, char * field_name, struct machine_state_type * state)
+static int parse_json_machine_state_field(cJSON * json_testcase, char * field_name, struct machine_state_type * state)
 {
     if (!cJSON_IsObject(json_testcase))
     {
@@ -92,7 +92,7 @@ int parse_json_machine_state_field(cJSON * json_testcase, char * field_name, str
     return 0;
 }
 
-int parse_json_testcase(cJSON * json_testcase, struct sim65_testcase_specification_type * testcase)
+static int parse_json_testcase(cJSON * json_testcase, struct sim65_testcase_specification_type * testcase)
 {
     if (!cJSON_IsObject(json_testcase))
     {
@@ -119,7 +119,7 @@ int parse_json_testcase(cJSON * json_testcase, struct sim65_testcase_specificati
     return 0;
 }
 
-int process_json_testcase_array(const char * filename, cJSON * json_testcase_array)
+static int process_json_testcase_array(const char * filename, cJSON * json_testcase_array, enum sim65_cpu_mode_type cpu_mode)
 {
     if (!cJSON_IsArray(json_testcase_array))
     {
@@ -142,7 +142,7 @@ int process_json_testcase_array(const char * filename, cJSON * json_testcase_arr
         }
         else
         {
-            int testcase_result = execute_testcase(&testcase, filename, testcase_index);
+            int testcase_result = execute_testcase(&testcase, filename, testcase_index, cpu_mode);
             if (testcase_result != 0)
             {
                 ++testcase_error;
@@ -156,7 +156,7 @@ int process_json_testcase_array(const char * filename, cJSON * json_testcase_arr
     return 0;
 }
 
-int process_testcase_file(char * filename)
+static int process_testcase_file(char * filename, enum sim65_cpu_mode_type cpu_mode)
 {
     FILE * f = fopen(filename, "r");
     if (f == NULL)
@@ -168,14 +168,14 @@ int process_testcase_file(char * filename)
     if (fseek_begin_result != 0)
     {
         fclose(f);
-        return -2; // fseek() to end error.
+        return -1; // fseek() to end error.
     }
 
     long ftell_result = ftell(f);
     if (ftell_result < 0)
     {
         fclose(f);
-        return -3; // ftell() error.
+        return -1; // ftell() error.
     }
 
     size_t string_size = ftell_result;
@@ -184,7 +184,7 @@ int process_testcase_file(char * filename)
     if (string == NULL)
     {
         fclose(f);
-        return -4; // malloc() error.
+        return -1; // malloc() error.
     }
 
     int fseek_end_result = fseek(f, 0, SEEK_SET);
@@ -192,7 +192,7 @@ int process_testcase_file(char * filename)
     {
         free(string);
         fclose(f);
-        return -5; // fseek() to beginning error.
+        return -1; // fseek() to beginning error.
     }
 
     size_t number_of_items = fread(string, 1, string_size, f);
@@ -200,14 +200,14 @@ int process_testcase_file(char * filename)
     {
         free(string);
         fclose(f);
-        return -6; // fread() error.
+        return -1; // fread() error.
     }
 
     int fclose_result = fclose(f);
     if (fclose_result != 0)
     {
         free(string);
-        return -7; // close() error.
+        return -1; // close() error.
     }
 
     cJSON *json_testcase_array = cJSON_ParseWithLength(string, string_size);
@@ -215,10 +215,10 @@ int process_testcase_file(char * filename)
 
     if (!cJSON_IsArray(json_testcase_array))
     {
-        return -8; // JSON parse error.
+        return -1; // JSON parse error.
     }
 
-    int result = process_json_testcase_array(filename, json_testcase_array);
+    int result = process_json_testcase_array(filename, json_testcase_array, cpu_mode);
 
     cJSON_Delete(json_testcase_array);
 
@@ -227,26 +227,51 @@ int process_testcase_file(char * filename)
 
 int main(int argc, char ** argv)
 {
+    enum sim65_cpu_mode_type cpu_mode = SIM65_CPU_6502;
 
     if (argc == 1)
     {
-        puts("Usage: sim65-test [FILE]...");
+        puts("Usage: sim65-test [--cpu-mode=<mode>] [FILE]...");
         puts("");
         puts("Test the instruction execution code from sim65 using JSON-formatted testcases.");
         puts("");
         puts("Each FILE should be a JSON-formatted file specifying single-instruction testcases,");
         puts("formatted according to the conventions used in the 65x02 project.");
         puts("");
-        puts("The precise JSON format specification, as welll as a large corpus of testcases,");
+        puts("The precise JSON format specification, as well as a large corpus of testcases,");
         puts("can be obtained from the 65x02 project:");
         puts("");
-        puts("  https://github.com/SingleStepTests/65x02");
+        puts("    https://github.com/SingleStepTests/65x02");
+        puts("");
+        puts("By default, sim65-test will configure sim65 to simulate a vanilla '6502' CPU; this");
+        puts("can be changed by providing a --cpu-mode=<mode> argument.");
+        puts("");
+        puts("The following CPU modes are supported:");
+        puts("");
+        puts("  --cpu-mode=6502      Simulate a vanilla 6502 processor.");
+        puts("  --cpu-mode=65c02     Simulate a 65C02 processor.");
+        puts("  --cpu-mode=6502x     Simulate a 6502x processor.");
         puts("");
     }
 
     for (int i = 1; i < argc; ++i)
     {
-        process_testcase_file(argv[i]);
+        if (strcmp(argv[i], "--cpu-mode=6502") == 0)
+        {
+            cpu_mode = SIM65_CPU_6502;
+        }
+        else if (strcmp(argv[i], "--cpu-mode=6502") == 0)
+        {
+            cpu_mode = SIM65_CPU_65C02;
+        }
+        else if (strcmp(argv[i], "--cpu-mode=6502") == 0)
+        {
+            cpu_mode = SIM65_CPU_6502X;
+        }
+        else
+        {
+            process_testcase_file(argv[i], cpu_mode);
+        }
     }
 
     return 0;
