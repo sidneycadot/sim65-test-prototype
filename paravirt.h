@@ -1,4 +1,6 @@
 
+// NOTE: This is a replacement for sim65's "paravirt.h", providing only the definitions needed to support sim65-test.
+
 #ifndef PARAVIRT_H
 #define PARAVIRT_H
 

@@ -1,23 +1,10 @@
 
+// NOTE: This is a replacement for sim65's "error.h", providing only the definitions needed to support sim65-test.
+
 #ifndef ERROR_H
 #define ERROR_H
 
-
-void Warning (const char* Format, ...);
-
-void Error (const char* Format, ...);
-
-//void ErrorCode (int Code, const char* Format, ...) attribute((noreturn, format(printf,2,3)));
-///* Print an error message and die with the given exit code */
-
-//void Internal (const char* Format, ...) attribute((noreturn, format(printf,1,2)));
-///* Print an internal error message and die */
-
-//void SimExit (int Code);
-///* Exit the simulation with an exit code */
-
-
-
-/* End of error.h */
+void Warning (const char *, ...);
+void Error (const char *, ...);
 
 #endif
