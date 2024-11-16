@@ -57,17 +57,17 @@ have different behavior compared to their counterparts when run from 'sim65':
   needed both to set up the CPU at the start of each test, and to verify the CPU state at the end of each test.
 
 - The 'Error' and 'Warning' functions are redefined. The fact that they are called is reported by sim65-test;
-  and sim65-test's the 'Error' function does not terminate execution of the process.
+  and sim65-test's implementation of the 'Error' function does not terminate execution of the process.
 
 - The 'Mem' functions as implemented by sim65-test verify the address at which they are called, unlike their
   sim65 counterparts.
 
 To enable the 'sim65-test' versions of these functions, minimalistic replacement header files are provided
-('paravirt.h', error.h, memory.h) that only define prototypes for the functions we want. The sim65-test
+('paravirt.h', error.h, and memory.h) that only define prototypes for the functions we want. The sim65-test
 specific versions for the functions are implemented in 'sim65-testcase.c'.
 
 What this all means is that it allows the 'sim65-test' program to work with the original, unaltered versions
-of '6502.c' and '6502.h' as found in cc65/src/sim65.
+of '6502.c' and '6502.h' as found in cc65/src/sim65, which is desirable for the purpose of testing.
 
 
 Status and future development
