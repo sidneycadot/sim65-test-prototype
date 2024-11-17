@@ -233,24 +233,25 @@ int main(int argc, char ** argv)
     {
         puts("Usage: sim65-test [--cpu-mode=<mode>] [FILE]...");
         puts("");
-        puts("Test the instruction execution code from sim65 using JSON-formatted testcases.");
+        puts("Test the instruction execution code from sim65 using JSON-formatted test cases.");
         puts("");
-        puts("Each FILE should be a JSON-formatted file specifying single-instruction testcases,");
-        puts("formatted according to the conventions used in the 65x02 project.");
+        puts("Each FILE should be a JSON-formatted file specifying a number of test cases,");
+        puts("each describing the effect of the execution of a single instruction.");
         puts("");
-        puts("The precise JSON format specification, as well as a large corpus of testcases,");
-        puts("can be obtained from the 65x02 project:");
+        puts("Test case files support the JSON-based convention used in the 65x02 project:");
         puts("");
         puts("    https://github.com/SingleStepTests/65x02");
         puts("");
-        puts("By default, sim65-test will configure sim65 to simulate a vanilla '6502' CPU; this");
-        puts("can be changed by providing a --cpu-mode=<mode> argument.");
+        puts("The 65x02 test suite can be obtained by cloning the 65x02 Git repository:");
         puts("");
-        puts("The following CPU modes are supported:");
+        puts("    git clone git@github.com:SingleStepTests/65x02.git");
+        puts("");
+        puts("By default, sim65-test will configure sim65 to simulate a vanilla '6502' CPU.");
+        puts("This can be changed by providing a --cpu-mode=<mode> argument:");
         puts("");
         puts("  --cpu-mode=6502      Simulate a vanilla 6502 processor.");
         puts("  --cpu-mode=65c02     Simulate a 65C02 processor.");
-        puts("  --cpu-mode=6502x     Simulate a 6502x processor.");
+        puts("  --cpu-mode=6502x     Simulate a 6502X processor.");
         puts("");
     }
 
