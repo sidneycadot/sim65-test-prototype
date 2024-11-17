@@ -15,18 +15,20 @@
 
 // The CPURegs structure is a static variable defined in 6502.c.
 // We obtain a pointer to it by (ab)using the 'ParaVirtHooks' function.
-CPURegs * cpu_state_ptr;
+static CPURegs * cpu_state_ptr;
 
 // Define memory array.
 // The unsigned char base type is also used in sim65.
-unsigned char mem[0x10000]; 
+static unsigned char mem[0x10000]; 
 
-bool sim65_mem_write_byte_address_violation;
-bool sim65_mem_read_byte_address_violation;
-bool sim65_reported_error;
-bool sim65_reported_warning;
+static bool sim65_mem_write_byte_address_violation;
+static bool sim65_mem_read_byte_address_violation;
+static bool sim65_reported_error;
+static bool sim65_reported_warning;
 
-void MemWriteByte (unsigned Addr, unsigned char Val)
+/////////////////////////////////////////////////////////////////// start of re-implementation of functions that are called from 6502.c.
+
+void MemWriteByte(unsigned Addr, unsigned char Val)
 {
     if (Addr > 0xffff)
     {
@@ -38,7 +40,7 @@ void MemWriteByte (unsigned Addr, unsigned char Val)
     }
 }
 
-void MemWriteWord (unsigned Addr, unsigned Val)
+void MemWriteWord(unsigned Addr, unsigned Val)
 {
     // Same implementation as sim65.
     MemWriteByte (Addr, Val & 0xFF);
@@ -74,20 +76,23 @@ unsigned MemReadZPWord(unsigned char Addr)
 
 void ParaVirtHooks(CPURegs * Regs)
 {
+    // Copy the pointer to the CPU state to our local 'cpu_state_ptr', which we can subsequently use to access the simulated CPU's registers.
     cpu_state_ptr = Regs;
 }
 
-void Error (const char * Format, ...)
+void Error(const char * Format, ...)
 {
     (void)Format;
     sim65_reported_error = true;
 }
 
-void Warning (const char * Format, ...)
+void Warning(const char * Format, ...)
 {
     (void)Format;
     sim65_reported_warning = true;
 }
+
+/////////////////////////////////////////////////////////////////// end of re-implementation of functions that are called from 6502.c.
 
 int execute_testcase(struct sim65_testcase_specification_type * testcase, const char * filename, unsigned testcase_index, enum sim65_cpu_mode_type cpu_mode)
 {
@@ -110,8 +115,10 @@ int execute_testcase(struct sim65_testcase_specification_type * testcase, const 
         }
         default:
         {
-            // Bad CPU mode.
+            // Bad CPU mode. This should never happen.
             assert(false);
+            // In case assertions are disabled, at least proceed with a well-defined CPU type.
+            CPU = CPU_6502;
         }
     }
 
@@ -125,8 +132,9 @@ int execute_testcase(struct sim65_testcase_specification_type * testcase, const 
 
     Reset();
 
-    // Executing a single instruction. Since it is a jump instruction, this will trigger a 'ParaVirtHooks'
-    // invocation, which will tell us the ocation of the CPURegs struct used by 6502.c.
+    // Executing a single instruction, which will be read from 0xfffb.
+    // Since it is a jump instruction, this will trigger a 'ParaVirtHooks' invocation,
+    // which will give us the location of the CPURegs struct used by 6502.c.
 
     cpu_state_ptr = NULL;
 
@@ -137,6 +145,8 @@ int execute_testcase(struct sim65_testcase_specification_type * testcase, const 
 
     ExecuteInsn(); // Execute the single JMP instruction.
 
+    // Verify that the JMP instruction didn't do anything naughty.
+
     assert(sim65_mem_write_byte_address_violation == false);
     assert(sim65_mem_read_byte_address_violation == false);
     assert(sim65_reported_error == false);
@@ -144,10 +154,12 @@ int execute_testcase(struct sim65_testcase_specification_type * testcase, const 
 
     // The JMP instruction handler in 6502.c called our 'ParaVirtHooks' function (defined above),
     // which set the cpu_state_ptr to point to the 'Regs' static variable in 6502.c.
+    // Verify that this did, indeed, happen.
 
     assert(cpu_state_ptr != NULL);
 
     // Initialize the sim65 state from the "initial" state.
+    // Note: the "ZR" field seems vestigial. Initialize it to zero anyway.
 
     cpu_state_ptr->AC = testcase->initial_state.a;
     cpu_state_ptr->XR = testcase->initial_state.x;
