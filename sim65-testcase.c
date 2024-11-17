@@ -45,7 +45,7 @@ void MemWriteWord (unsigned Addr, unsigned Val)
     MemWriteByte (Addr + 1, Val >> 8);
 }
 
-unsigned char MemReadByte (unsigned Addr)
+unsigned char MemReadByte(unsigned Addr)
 {
     if (Addr > 0xffff)
     {
@@ -58,14 +58,14 @@ unsigned char MemReadByte (unsigned Addr)
     }
 }
 
-unsigned MemReadWord (unsigned Addr)
+unsigned MemReadWord(unsigned Addr)
 {
     // Same implementation as sim65.
     unsigned W = MemReadByte (Addr++);
     return (W | (MemReadByte (Addr) << 8));
 }
 
-unsigned MemReadZPWord (unsigned char Addr)
+unsigned MemReadZPWord(unsigned char Addr)
 {
     // Same implementation as sim65.
     unsigned W = MemReadByte (Addr++);
@@ -77,13 +77,15 @@ void ParaVirtHooks(CPURegs * Regs)
     cpu_state_ptr = Regs;
 }
 
-void Error (const char *, ...)
+void Error (const char * Format, ...)
 {
+    (void)Format;
     sim65_reported_error = true;
 }
 
-void Warning (const char *, ...)
+void Warning (const char * Format, ...)
 {
+    (void)Format;
     sim65_reported_warning = true;
 }
 
@@ -140,8 +142,8 @@ int execute_testcase(struct sim65_testcase_specification_type * testcase, const 
     assert(sim65_reported_error == false);
     assert(sim65_reported_warning == false);
 
-    // The JMP instruction should have called our 'ParaVirtHooks' function (defined above), which should
-    // have set the cpu_state_ptr.
+    // The JMP instruction handler in 6502.c called our 'ParaVirtHooks' function (defined above),
+    // which set the cpu_state_ptr to point to the 'Regs' static variable in 6502.c.
 
     assert(cpu_state_ptr != NULL);
 
@@ -155,11 +157,11 @@ int execute_testcase(struct sim65_testcase_specification_type * testcase, const 
     cpu_state_ptr->SP = testcase->initial_state.s;
     cpu_state_ptr->PC = testcase->initial_state.pc;
 
-    // Initialize memory according to the initial (pre-instruction) state.
+    // Initialize memory according to the initial (pre-instruction) state specified in the testcase.
     memcpy(mem, testcase->initial_state.ram, 0x10000);
 
     // Run a single instruction.
-    unsigned cyclecount = ExecuteInsn();
+    unsigned sim65_cyclecount = ExecuteInsn();
 
     // Verify state of CPU and memory and cycle count.
 
@@ -233,9 +235,9 @@ int execute_testcase(struct sim65_testcase_specification_type * testcase, const 
         ++errors_seen;
     }
 
-    if (testcase->cycles != cyclecount)
+    if (testcase->cycles != sim65_cyclecount)
     {
-        printf("[%s:%u (\"%s\")] ERROR - cycle count check failed (expected: %u, sim65: %u).\n", filename, testcase_index, testcase->name, testcase->cycles, cyclecount);
+        printf("[%s:%u (\"%s\")] ERROR - cycle count check failed (expected: %u, sim65: %u).\n", filename, testcase_index, testcase->name, testcase->cycles, sim65_cyclecount);
         ++errors_seen;
     }
 
