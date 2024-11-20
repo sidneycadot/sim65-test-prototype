@@ -28,7 +28,7 @@ static bool sim65_reported_warning;
 
 /////////////////////////////////////////////////////////////////// start of re-implementation of functions that are called from 6502.c.
 
-void MemWriteByte(unsigned Addr, unsigned char Val)
+void MemWriteByte(uint16_t Addr, uint8_t Val)
 {
     if (Addr > 0xffff)
     {
@@ -40,14 +40,14 @@ void MemWriteByte(unsigned Addr, unsigned char Val)
     }
 }
 
-void MemWriteWord(unsigned Addr, unsigned Val)
+void MemWriteWord(uint16_t Addr, uint16_t Val)
 {
     // Same implementation as sim65.
     MemWriteByte (Addr, Val & 0xFF);
     MemWriteByte (Addr + 1, Val >> 8);
 }
 
-unsigned char MemReadByte(unsigned Addr)
+uint8_t MemReadByte(uint16_t Addr)
 {
     if (Addr > 0xffff)
     {
@@ -60,14 +60,14 @@ unsigned char MemReadByte(unsigned Addr)
     }
 }
 
-unsigned MemReadWord(unsigned Addr)
+uint16_t MemReadWord(uint16_t Addr)
 {
     // Same implementation as sim65.
     unsigned W = MemReadByte (Addr++);
     return (W | (MemReadByte (Addr) << 8));
 }
 
-unsigned MemReadZPWord(unsigned char Addr)
+uint16_t MemReadZPWord(uint8_t Addr)
 {
     // Same implementation as sim65.
     unsigned W = MemReadByte (Addr++);
@@ -199,15 +199,9 @@ int execute_testcase(struct sim65_testcase_specification_type * testcase, const 
         ++errors_seen;
     }
 
-    if (sim65_reported_error)
+    if (sim65_mem_write_byte_address_violation)
     {
-        printf("[%s:%u (\"%s\")] ERROR - A register check failed (expected: 0x%02x, sim65: 0x%02x).\n", filename, testcase_index, testcase->name, testcase->final_state.a, cpu_state_ptr->AC);
-        ++errors_seen;
-    }
-
-    if (sim65_reported_warning)
-    {
-        printf("[%s:%u (\"%s\")] ERROR - A register check failed (expected: 0x%02x, sim65: 0x%02x).\n", filename, testcase_index, testcase->name, testcase->final_state.a, cpu_state_ptr->AC);
+        printf("[%s:%u (\"%s\")] ERROR - sim65 tried to write memory beyond the last address.\n", filename, testcase_index, testcase->name);
         ++errors_seen;
     }
 
@@ -255,7 +249,13 @@ int execute_testcase(struct sim65_testcase_specification_type * testcase, const 
 
     if (memcmp(testcase->final_state.ram, mem, 0x10000) != 0)
     {
-        printf("[%s:%u (\"%s\")] ERROR - memory check failed.\n", filename, testcase_index, testcase->name);
+        unsigned address;
+        for (address = 0; testcase->final_state.ram[address] == mem[address]; ++address)
+        {
+            // Find first address with a difference.
+        }
+        printf("[%s:%u (\"%s\")] ERROR - memory check failed: (address 0x%04x: expected 0x%02x, sim65: 0x%02x).\n", filename, testcase_index, testcase->name,
+            address, testcase->final_state.ram[address], mem[address]);
         ++errors_seen;
     }
 

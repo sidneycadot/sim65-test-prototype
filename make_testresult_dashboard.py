@@ -58,7 +58,7 @@ def main():
                     color="orange"
                 else:
                     color="orangered"
-                print(f"<td style=\"background-color:{color}\">0x{opcode}: ({bad_perc:.2f}%)</td>", end='')
+                print(f"<td style=\"background-color:{color}\">0x{opcode}:&nbsp;({bad_perc:.2f}%)</td>", end='')
         print("</tr>")
     print("    </table>")
     print(f"    <p>In total, {summary.error_count} out of {summary.test_count} tests failed ({summary.error_count/summary.test_count*100.0:.3f}%).</h1>")

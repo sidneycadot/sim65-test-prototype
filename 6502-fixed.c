@@ -707,8 +707,9 @@ static unsigned HaveIRQRequest;
         unsigned char OldPCH;                                   \
         ++Cycles;                                               \
         Offs = (signed char) MemReadByte (Regs.PC+1);           \
+        Regs.PC +=2;                                            \
         OldPCH = PCH;                                           \
-        Regs.PC = (Regs.PC + 2 + (int) Offs) & 0xFFFF;          \
+        Regs.PC = (Regs.PC + (int) Offs) & 0xFFFF;              \
         if (PCH != OldPCH) {                                    \
             ++Cycles;                                           \
         }                                                       \
@@ -1016,7 +1017,7 @@ static void OPC_6502_00 (void)
     Regs.PC += 2;
     PUSH (PCH);
     PUSH (PCL);
-    PUSH (Regs.SR);
+    PUSH (Regs.SR | BF);
     SET_IF (1);
     if (CPU == CPU_65C02)
     {
@@ -1091,7 +1092,7 @@ static void OPC_6502_08 (void)
 /* Opcode $08: PHP */
 {
     Cycles = 3;
-    PUSH (Regs.SR);
+    PUSH (Regs.SR | BF);
     Regs.PC += 1;
 }
 
@@ -1404,9 +1405,7 @@ static void OPC_6502_28 (void)
 /* Opcode $28: PLP */
 {
     Cycles = 4;
-
-    /* Bits 5 and 4 aren't used, and always are 1! */
-    Regs.SR = (POP () | 0x30);
+    Regs.SR = (POP () | 0x20) & ~BF;
     Regs.PC += 1;
 }
 
@@ -1607,9 +1606,7 @@ static void OPC_6502_40 (void)
 /* Opcode $40: RTI */
 {
     Cycles = 6;
-
-    /* Bits 5 and 4 aren't used, and always are 1! */
-    Regs.SR = POP () | 0x30;
+    Regs.SR = (POP () | 0x20) & ~BF;
     Regs.PC = POP ();                /* PCL */
     Regs.PC |= (POP () << 8);        /* PCH */
 }
@@ -4086,8 +4083,12 @@ void Reset (void)
     HaveIRQRequest = 0;
     HaveNMIRequest = 0;
 
-    /* Bits 5 and 4 aren't used, and always are 1! */
-    Regs.SR = 0x30;
+    /* Note: bits 5 and 4 do not actually exist in the processor.
+       Whenever the status register is pushed to the stack, interrupt 5 is pushed as if it is a 1,
+       and bit 4 is pushed as 0, except when handling the BRK instruction.
+       In the SR variable, we always represent bit 5 as 1, and bit 4 as 0.
+    */
+    Regs.SR = 0x20;
     Regs.PC = MemReadWord (0xFFFC);
 }
 
@@ -4102,7 +4103,7 @@ unsigned ExecuteInsn (void)
         HaveNMIRequest = 0;
         PUSH (PCH);
         PUSH (PCL);
-        PUSH (Regs.SR & ~BF);
+        PUSH (Regs.SR);
         SET_IF (1);
         if (CPU != CPU_6502)
         {
@@ -4116,7 +4117,7 @@ unsigned ExecuteInsn (void)
         HaveIRQRequest = 0;
         PUSH (PCH);
         PUSH (PCL);
-        PUSH (Regs.SR & ~BF);
+        PUSH (Regs.SR);
         SET_IF (1);
         if (CPU != CPU_6502)
         {

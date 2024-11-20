@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 #include "cJSON.h"
 #include "sim65-testcase.h"
@@ -48,10 +49,13 @@ static int parse_json_machine_state_field(cJSON * json_testcase, char * field_na
         parse_json_ranged_unsigned_number_field(json_field, "a" ,   0xff, &state->a ) != 0 ||
         parse_json_ranged_unsigned_number_field(json_field, "x" ,   0xff, &state->x ) != 0 ||
         parse_json_ranged_unsigned_number_field(json_field, "y" ,   0xff, &state->y ) != 0 ||
-        parse_json_ranged_unsigned_number_field(json_field, "p" ,   0xff, &state->p ))
+        parse_json_ranged_unsigned_number_field(json_field, "p" ,   0xff, &state->p ) != 0)
     {
         return -1;
     }
+
+    // Bits 4 and 5 of the P pseudo-register are always given as 0 (bit 4) and 1 (bit 5).
+    assert((state->p & 0x30) == 0x20);
 
     cJSON * ramspec = cJSON_GetObjectItemCaseSensitive(json_field, "ram");
     if (!cJSON_IsArray(ramspec))
