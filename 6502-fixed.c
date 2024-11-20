@@ -579,6 +579,11 @@ static unsigned HaveIRQRequest;
 #define STO_CY_ZPINDY   6
 #define STO_CY_ZPIND    5
 
+#define STO_CY_ZPINDY_NP   STO_CY_ZPINDY
+
+#define STO_CY_ABSX_NP  STO_CY_ABSX
+#define STO_CY_ABSY_NP  STO_CY_ABSY
+
 /* zp / zp,x / zp,y / abs / abs,x / abs,y / (zp,x) / (zp),y / (zp) */
 #define STO_OP(mode, op)                                        \
     unsigned address;                                           \
@@ -665,7 +670,8 @@ static unsigned HaveIRQRequest;
 /* ADC */
 #define ADC(v)                                                  \
     do {                                                        \
-        unsigned old = Regs.AC;                                 \
+        unsigned Regs_AC = Regs.AC;                             \
+        unsigned old = Regs_AC;                                 \
         unsigned rhs = (v & 0xFF);                              \
         if (GET_DF ()) {                                        \
             unsigned lo;                                        \
@@ -674,29 +680,30 @@ static unsigned HaveIRQRequest;
             if (lo >= 0x0A) {                                   \
                 lo = ((lo + 0x06) & 0x0F) + 0x10;               \
             }                                                   \
-            Regs.AC = (old & 0xF0) + (rhs & 0xF0) + lo;         \
+            Regs_AC = (old & 0xF0) + (rhs & 0xF0) + lo;         \
             res = (signed char)(old & 0xF0) +                   \
                   (signed char)(rhs & 0xF0) +                   \
                   (signed char)lo;                              \
             TEST_ZF (old + rhs + GET_CF ());                    \
-            TEST_SF (Regs.AC);                                  \
-            if (Regs.AC >= 0xA0) {                              \
-                Regs.AC += 0x60;                                \
+            TEST_SF (Regs_AC);                                  \
+            if (Regs_AC >= 0xA0) {                              \
+                Regs_AC += 0x60;                                \
             }                                                   \
-            TEST_CF (Regs.AC);                                  \
+            TEST_CF (Regs_AC);                                  \
             SET_OF ((res < -128) || (res > 127));               \
             if (CPU == CPU_65C02) {                             \
                 ++Cycles;                                       \
             }                                                   \
         } else {                                                \
-            Regs.AC += rhs + GET_CF ();                         \
-            TEST_ZF (Regs.AC);                                  \
-            TEST_SF (Regs.AC);                                  \
-            TEST_CF (Regs.AC);                                  \
+            Regs_AC += rhs + GET_CF ();                         \
+            TEST_ZF (Regs_AC);                                  \
+            TEST_SF (Regs_AC);                                  \
+            TEST_CF (Regs_AC);                                  \
             SET_OF (!((old ^ rhs) & 0x80) &&                    \
-                    ((old ^ Regs.AC) & 0x80));                  \
-            Regs.AC &= 0xFF;                                    \
+                    ((old ^ Regs_AC) & 0x80));                  \
+            Regs_AC &= 0xFF;                                    \
         }                                                       \
+        Regs.AC = Regs_AC;                                      \
     } while (0)
 
 /* branches */
@@ -737,23 +744,29 @@ static unsigned HaveIRQRequest;
 
 /* ROL */
 #define ROL(Val)                                                \
-    Val <<= 1;                                                  \
-    if (GET_CF ()) {                                            \
-        Val |= 0x01;                                            \
-    }                                                           \
-    TEST_ZF (Val);                                              \
-    TEST_SF (Val);                                              \
-    TEST_CF (Val)
+    do {                                                        \
+        unsigned ShiftOut = (Val & 0x80);                       \
+        Val <<= 1;                                              \
+        if (GET_CF ()) {                                        \
+            Val |= 0x01;                                        \
+        }                                                       \
+        TEST_ZF (Val);                                          \
+        TEST_SF (Val);                                          \
+        SET_CF (ShiftOut);                                      \
+    } while (0)
 
 /* ROR */
 #define ROR(Val)                                                \
-    if (GET_CF ()) {                                            \
-        Val |= 0x100;                                           \
-    }                                                           \
-    SET_CF (Val & 0x01);                                        \
-    Val >>= 1;                                                  \
-    TEST_ZF (Val);                                              \
-    TEST_SF (Val)
+    do {                                                        \
+        unsigned ShiftOut = (Val & 0x01);                       \
+        Val >>= 1;                                              \
+        if (GET_CF ()) {                                        \
+            Val |= 0x80;                                        \
+        }                                                       \
+        TEST_ZF (Val);                                          \
+        TEST_SF (Val);                                          \
+        SET_CF (ShiftOut);                                      \
+    } while(0)
 
 /* ASL */
 #define ASL(Val)                                                \
@@ -1316,7 +1329,7 @@ static void OPC_6502_1D (void)
 static void OPC_6502_1E (void)
 /* Opcode $1E: ASL abs,x */
 {
-    MEM_OP (ABSX, ASL);
+    MEM_OP (ABSX_NP, ASL);
 }
 
 
@@ -1340,13 +1353,26 @@ static void OPC_6502_1F (void)
 static void OPC_6502_20 (void)
 /* Opcode $20: JSR */
 {
-    unsigned Addr;
+    /* There is a non-obvious case that needs to be handled here.
+     * The pushing of the return address can interfere with the reading of the
+     * destination address, if the JMP target is located, wholly or in part,
+     * inside the stack page (!?!). This won't happen in normal code but it can
+     * happen in specifically constructed examples.
+     *
+     * To deal with this, we load the LSB and MSB of the target address separately,
+     * alternated with the pushing of the return address on the stack.
+     */
+
+    unsigned AddrLo, AddrHi;
+
     Cycles = 6;
-    Addr = MemReadWord (Regs.PC+1);
-    Regs.PC += 2;
+    Regs.PC += 1;
+    AddrLo = MemReadByte(Regs.PC);
+    Regs.PC += 1;
     PUSH (PCH);
+    AddrHi = MemReadByte(Regs.PC);
     PUSH (PCL);
-    Regs.PC = Addr;
+    Regs.PC = AddrLo + (AddrHi << 8);
 
     ParaVirtHooks (&Regs);
 }
@@ -1581,7 +1607,7 @@ static void OPC_6502_3D (void)
 static void OPC_6502_3E (void)
 /* Opcode $3E: ROL abs,x */
 {
-    MEM_OP (ABSX, ROL);
+    MEM_OP (ABSX_NP, ROL);
 }
 
 
@@ -1836,7 +1862,7 @@ static void OPC_6502_5D (void)
 static void OPC_6502_5E (void)
 /* Opcode $5E: LSR abs,x */
 {
-    MEM_OP (ABSX, LSR);
+    MEM_OP (ABSX_NP, LSR);
 }
 
 
@@ -2150,7 +2176,7 @@ static void OPC_6502_7D (void)
 static void OPC_6502_7E (void)
 /* Opcode $7E: ROR abs,x */
 {
-    MEM_OP (ABSX, ROR);
+    MEM_OP (ABSX_NP, ROR);
 }
 
 
@@ -2322,7 +2348,7 @@ static void OPC_6502_90 (void)
 static void OPC_6502_91 (void)
 /* Opcode $91: sta (zp),y */
 {
-    STO_OP (ZPINDY, Regs.AC);
+    STO_OP (ZPINDY_NP, Regs.AC);
 }
 
 
@@ -2390,7 +2416,7 @@ static void OPC_6502_98 (void)
 static void OPC_6502_99 (void)
 /* Opcode $99: STA abs,y */
 {
-    STO_OP (ABSY, Regs.AC);
+    STO_OP (ABSY_NP, Regs.AC);
 }
 
 
@@ -2432,7 +2458,7 @@ static void OPC_65SC02_9C (void)
 static void OPC_6502_9D (void)
 /* Opcode $9D: STA abs,x */
 {
-    STO_OP (ABSX, Regs.AC);
+    STO_OP (ABSX_NP, Regs.AC);
 }
 
 
@@ -2958,7 +2984,7 @@ static void OPC_6502_DD (void)
 static void OPC_6502_DE (void)
 /* Opcode $DE: DEC abs,x */
 {
-    MEM_OP (ABSX, DEC);
+    MEM_OP (ABSX_NP, DEC);
 }
 
 
@@ -3238,7 +3264,7 @@ static void OPC_6502_FD (void)
 static void OPC_6502_FE (void)
 /* Opcode $FE: INC abs,x */
 {
-    MEM_OP (ABSX, INC);
+    MEM_OP (ABSX_NP, INC);
 }
 
 
