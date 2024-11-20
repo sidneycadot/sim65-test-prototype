@@ -6,7 +6,7 @@
 #ifndef SIM65_TESTCASE_H
 #define SIM65_TESTCASE_H
 
-#include <inttypes.h>
+#include <stdint.h>
 
 struct machine_state_type
 {

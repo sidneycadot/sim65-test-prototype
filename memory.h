@@ -6,7 +6,7 @@
 
 #if (FIX_SIM65==1)
 
-#include <inttypes.h>
+#include <stdint.h>
 void MemWriteByte (uint16_t Addr, uint8_t Val);
 void MemWriteWord (uint16_t Addr, uint16_t Val);
 uint8_t MemReadByte (uint16_t Addr);
