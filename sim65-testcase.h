@@ -6,15 +6,17 @@
 #ifndef SIM65_TESTCASE_H
 #define SIM65_TESTCASE_H
 
+#include <inttypes.h>
+
 struct machine_state_type
 {
-    unsigned pc;
-    unsigned s;
-    unsigned a;
-    unsigned x;
-    unsigned y;
-    unsigned p;
-    unsigned char ram[0x10000];
+    uint16_t pc;
+    uint8_t s;
+    uint8_t a;
+    uint8_t x;
+    uint8_t y;
+    uint8_t p;
+    uint8_t ram[0x10000];
 };
 
 struct sim65_testcase_specification_type

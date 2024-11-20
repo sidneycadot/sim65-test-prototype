@@ -36,7 +36,9 @@
 #ifndef _6502_H
 #define _6502_H
 
-
+#if (FIX_SIM65==1)
+#include <inttypes.h>
+#endif
 
 /*****************************************************************************/
 /*                                   Data                                    */
@@ -56,6 +58,18 @@ extern CPUType CPU;
 
 /* 6502 CPU registers */
 typedef struct CPURegs CPURegs;
+
+#if (FIX_SIM65==1)
+struct CPURegs {
+    uint8_t     AC;             /* Accumulator */
+    uint8_t     XR;             /* X register */
+    uint8_t     YR;             /* Y register */
+    uint8_t     ZR;             /* Z register */
+    uint8_t     SR;             /* Status register */
+    uint8_t     SP;             /* Stackpointer */
+    uint16_t    PC;             /* Program counter */
+};
+#else
 struct CPURegs {
     unsigned    AC;             /* Accumulator */
     unsigned    XR;             /* X register */
@@ -65,6 +79,7 @@ struct CPURegs {
     unsigned    SP;             /* Stackpointer */
     unsigned    PC;             /* Program counter */
 };
+#endif
 
 /* Status register bits */
 #define CF      0x01            /* Carry flag */

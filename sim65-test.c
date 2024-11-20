@@ -6,12 +6,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 
 #include "cJSON.h"
 #include "sim65-testcase.h"
 
-static int parse_json_ranged_unsigned_number_field(cJSON * json_object, char * field_name, unsigned max_unsigned_value, unsigned * value)
+static int parse_json_u8_field(cJSON * json_object, char * field_name, uint8_t * value)
 {
     cJSON * field = cJSON_GetObjectItemCaseSensitive(json_object, field_name);
     if (!cJSON_IsNumber(field))
@@ -19,19 +18,31 @@ static int parse_json_ranged_unsigned_number_field(cJSON * json_object, char * f
         return -1; // Field not found.
     }
 
-    if (field->valueint < 0)
+    if (field->valueint < 0 || field->valueint > 0xff)
     {
-        return -1; // Expecting an unsigned (non-negative) value.
+        return -1; // Expecting an unsigned 8-bit value.
     }
 
-    unsigned unsigned_value = field->valueint;
+    *value = field->valueint;
 
-    if (unsigned_value > max_unsigned_value)
+    return 0; // Success.
+}
+
+static int parse_json_u16_field(cJSON * json_object, char * field_name, uint16_t * value)
+{
+    cJSON * field = cJSON_GetObjectItemCaseSensitive(json_object, field_name);
+    if (!cJSON_IsNumber(field))
     {
-        return -1; // Number out of range.
+        return -1; // Field not found.
     }
 
-    *value = unsigned_value;
+    if (field->valueint < 0 || field->valueint > 0xffff)
+    {
+        return -1; // Expecting an unsigned 16-bit value.
+    }
+
+    *value = field->valueint;
+
     return 0; // Success.
 }
 
@@ -44,18 +55,15 @@ static int parse_json_machine_state_field(cJSON * json_testcase, char * field_na
 
     cJSON * json_field = cJSON_GetObjectItemCaseSensitive(json_testcase, field_name);
 
-    if (parse_json_ranged_unsigned_number_field(json_field, "pc", 0xffff, &state->pc) != 0 ||
-        parse_json_ranged_unsigned_number_field(json_field, "s" ,   0xff, &state->s ) != 0 ||
-        parse_json_ranged_unsigned_number_field(json_field, "a" ,   0xff, &state->a ) != 0 ||
-        parse_json_ranged_unsigned_number_field(json_field, "x" ,   0xff, &state->x ) != 0 ||
-        parse_json_ranged_unsigned_number_field(json_field, "y" ,   0xff, &state->y ) != 0 ||
-        parse_json_ranged_unsigned_number_field(json_field, "p" ,   0xff, &state->p ) != 0)
+    if (parse_json_u16_field(json_field, "pc", &state->pc) != 0 ||
+        parse_json_u8_field (json_field, "s" , &state->s ) != 0 ||
+        parse_json_u8_field (json_field, "a" , &state->a ) != 0 ||
+        parse_json_u8_field (json_field, "x" , &state->x ) != 0 ||
+        parse_json_u8_field (json_field, "y" , &state->y ) != 0 ||
+        parse_json_u8_field (json_field, "p" , &state->p ) != 0)
     {
         return -1;
     }
-
-    // Bits 4 and 5 of the P pseudo-register are always given as 0 (bit 4) and 1 (bit 5).
-    assert((state->p & 0x30) == 0x20);
 
     cJSON * ramspec = cJSON_GetObjectItemCaseSensitive(json_field, "ram");
     if (!cJSON_IsArray(ramspec))

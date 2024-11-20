@@ -2,10 +2,12 @@
 
 """Test legal/documented opcodes, which are the only ones that sim65 aims to support."""
 
+import argparse
 import os
 import subprocess
 
-def test_legal_6502_opcodes(testcase_directory: str) -> None:
+
+def test_legal_6502_opcodes(version: str, testcase_directory: str) -> None:
     """Test the 151 vanilla 6502 opcodes that sim65 supports."""
 
     legal_6502_opcode_matrix = """
@@ -29,12 +31,25 @@ def test_legal_6502_opcodes(testcase_directory: str) -> None:
 
     testfiles = [os.path.join(testcase_directory, f"{opcode}.json") for opcode in legal_6502_opcode_matrix.split() if opcode != ".."]
 
-    subprocess.run(["./sim65-test", "--cpu-mode=6502"] + testfiles)
+    if version == "original":
+        executable = "./sim65-original-test"
+    elif version == "fixed":
+        executable = "./sim65-fixed-test"
+    else:
+        raise ValueError()
+
+    subprocess.run([executable, "--cpu-mode=6502"] + testfiles)
 
 
 def main() -> None:
     """Test vanilla 6502 opcodes."""
-    test_legal_6502_opcodes("65x02/6502/v1")
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("version", choices=("original", "fixed"))
+    parser.add_argument("-t", "--testcase-directory", default="65x02/6502/v1")
+    args = parser.parse_args()
+
+    test_legal_6502_opcodes(args.version, args.testcase_directory)
 
 
 if __name__ == "__main__":
