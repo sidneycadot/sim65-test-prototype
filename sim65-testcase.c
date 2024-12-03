@@ -133,13 +133,12 @@ void Warning(const char * Format, ...)
 static uint8_t fix_p_register_value(uint8_t p)
 {
     // Test cases from the 65x02 test-set sometimes have their P register values set to different values (See: https://github.com/SingleStepTests/65x02/issues/8).
-    // Here, we fix those two bits to be 1 (bit 5) and 0 (bit 4).
-    p &= ~0x10;
-    p |= 0x20;
+    // We set both bits 4 and 5 here which is what sim65 does.
+    p |= 0x30;
     return p;
 }
 
-int execute_testcase(struct sim65_testcase_specification_type * testcase, const char * filename, unsigned testcase_index, enum sim65_cpu_mode_type cpu_mode)
+int execute_testcase(struct sim65_testcase_specification_type * testcase, const char * filename, unsigned testcase_index, enum sim65_cpu_mode_type cpu_mode, unsigned test_flags)
 {
     switch (cpu_mode)
     {
@@ -204,12 +203,10 @@ int execute_testcase(struct sim65_testcase_specification_type * testcase, const 
     assert(cpu_state_ptr != NULL);
 
     // Initialize the sim65 state from the "initial" state.
-    // Note: the "ZR" field seems vestigial. Initialize it to zero anyway.
 
     cpu_state_ptr->AC = testcase->initial_state.a;
     cpu_state_ptr->XR = testcase->initial_state.x;
     cpu_state_ptr->YR = testcase->initial_state.y;
-    cpu_state_ptr->ZR = 0;
     cpu_state_ptr->SR = fix_p_register_value(testcase->initial_state.p);
     cpu_state_ptr->SP = testcase->initial_state.s;
     cpu_state_ptr->PC = testcase->initial_state.pc;
@@ -286,13 +283,13 @@ int execute_testcase(struct sim65_testcase_specification_type * testcase, const 
         ++errors_seen;
     }
 
-    if (sim65_cyclecount != testcase->cycles)
+    if ((test_flags & F_TEST_CYCLECOUNT) && sim65_cyclecount != testcase->cycles)
     {
         printf("[%s:%u (\"%s\")] ERROR - cycle count check failed (expected: %u, sim65: %u).\n", filename, testcase_index, testcase->name, testcase->cycles, sim65_cyclecount);
         ++errors_seen;
     }
 
-    if (memcmp(mem, testcase->final_state.ram, 0x10000) != 0)
+    if ((test_flags & F_TEST_MEMORY) && memcmp(mem, testcase->final_state.ram, 0x10000) != 0)
     {
         unsigned address;
         for (address = 0; testcase->final_state.ram[address] == mem[address]; ++address)
