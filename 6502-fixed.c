@@ -714,7 +714,7 @@ static unsigned HaveIRQRequest;
         unsigned char OldPCH;                                   \
         ++Cycles;                                               \
         Offs = (signed char) MemReadByte (Regs.PC+1);           \
-        Regs.PC +=2;                                            \
+        Regs.PC += 2;                                           \
         OldPCH = PCH;                                           \
         Regs.PC = (Regs.PC + (int) Offs) & 0xFFFF;              \
         if (PCH != OldPCH) {                                    \
@@ -837,6 +837,12 @@ static unsigned HaveIRQRequest;
     SET_OF (Val & 0x40);                                        \
     SET_ZF ((Val & Regs.AC) == 0)
 
+/* BITIMM */
+/* The BIT instruction with immediate mode addressing only sets
+   the zero flag; the sign and overflow flags are not changed. */
+#define BITIMM(Val)                                             \
+    SET_ZF ((Val & Regs.AC) == 0)
+
 /* LDA */
 #define LDA(Val)                                                \
     Regs.AC = Val;                                              \
@@ -921,8 +927,12 @@ static unsigned HaveIRQRequest;
     } while (0);
 
 /* ANE */
+/* An "unstable" illegal opcode.
+ * Original sim65 behavior is to use the constant EF here.
+ * To get behavior in line with the 65x02 testsuite, use constant value 0xEE instead.
+ */
 #define ANE(Val)                                                \
-    Val = (Regs.AC | 0xEF) & Regs.XR & Val;                     \
+    Val = (Regs.AC | 0xEE) & Regs.XR & Val;                     \
     Regs.AC = Val;                                              \
     TEST_SF (Val);                                              \
     TEST_ZF (Val)
@@ -957,6 +967,15 @@ static unsigned HaveIRQRequest;
     Val &= (address >> 8) + 1
 
 /* SHA */
+/* Whether the last term is ANDed in IS deterministic, but complicated,
+ *   as it depends on signals into the 6502 during the instruction.
+ *
+ * The original sim65 code is:
+ *
+ * Val = Regs.AC & Regs.XR & ((address >> 8) + 1)
+ *
+ * Replace by this to get the 65x02 behavior:
+ */
 #define SHA(Val)                                                \
     Val = Regs.AC & Regs.XR & ((address >> 8) + 1)
 
@@ -1030,7 +1049,7 @@ static void OPC_6502_00 (void)
     Regs.PC += 2;
     PUSH (PCH);
     PUSH (PCL);
-    PUSH (Regs.SR | BF);
+    PUSH (Regs.SR);
     SET_IF (1);
     if (CPU == CPU_65C02)
     {
@@ -1105,7 +1124,7 @@ static void OPC_6502_08 (void)
 /* Opcode $08: PHP */
 {
     Cycles = 3;
-    PUSH (Regs.SR | BF);
+    PUSH (Regs.SR);
     Regs.PC += 1;
 }
 
@@ -1431,7 +1450,9 @@ static void OPC_6502_28 (void)
 /* Opcode $28: PLP */
 {
     Cycles = 4;
-    Regs.SR = (POP () | 0x20) & ~BF;
+
+    /* Bits 5 and 4 aren't used, and always are 1! */
+    Regs.SR = (POP () | 0x30);
     Regs.PC += 1;
 }
 
@@ -1632,7 +1653,9 @@ static void OPC_6502_40 (void)
 /* Opcode $40: RTI */
 {
     Cycles = 6;
-    Regs.SR = (POP () | 0x20) & ~BF;
+
+    /* Bits 5 and 4 aren't used, and always are 1! */
+    Regs.SR = POP () | 0x30;
     Regs.PC = POP ();                /* PCL */
     Regs.PC |= (POP () << 8);        /* PCH */
 }
@@ -1987,25 +2010,17 @@ static void OPC_6502_6C (void)
     PC = Regs.PC;
     Lo = MemReadWord (PC+1);
 
-    if (CPU == CPU_6502)
-    {
-         /* Emulate the 6502 bug */
-        Cycles = 5;
-        Regs.PC = MemReadByte (Lo);
-        Hi = (Lo & 0xFF00) | ((Lo + 1) & 0xFF);
-        Regs.PC |= (MemReadByte (Hi) << 8);
+    /* Emulate the buggy 6502 behavior */
+    Cycles = 5;
+    Regs.PC = MemReadByte (Lo);
+    Hi = (Lo & 0xFF00) | ((Lo + 1) & 0xFF);
+    Regs.PC |= (MemReadByte (Hi) << 8);
 
-        /* Output a warning if the bug is triggered */
-        if (Hi != Lo + 1)
-        {
-            Warning ("6502 indirect jump bug triggered at $%04X, ind addr = $%04X",
-                     PC, Lo);
-        }
-    }
-    else
+    /* Output a warning if the bug is triggered */
+    if (Hi != Lo + 1)
     {
-        Cycles = 6;
-        Regs.PC = MemReadWord(Lo);
+        Warning ("6502 indirect jump bug triggered at $%04X, ind addr = $%04X",
+                    PC, Lo);
     }
 
     ParaVirtHooks (&Regs);
@@ -2280,7 +2295,9 @@ static void OPC_6502_88 (void)
 static void OPC_65SC02_89 (void)
 /* Opcode $89: BIT #imm */
 {
-    ALU_OP_IMM (BIT);
+    /* Note: BIT #imm behaves differently from BIT with other addressing modes,
+     * hence the different 'op' argument to the macro. */
+    ALU_OP_IMM (BITIMM);
 }
 
 
@@ -4109,12 +4126,8 @@ void Reset (void)
     HaveIRQRequest = 0;
     HaveNMIRequest = 0;
 
-    /* Note: bits 5 and 4 do not actually exist in the processor.
-       Whenever the status register is pushed to the stack, interrupt 5 is pushed as if it is a 1,
-       and bit 4 is pushed as 0, except when handling the BRK instruction.
-       In the SR variable, we always represent bit 5 as 1, and bit 4 as 0.
-    */
-    Regs.SR = 0x20;
+    /* Bits 5 and 4 aren't used, and always are 1! */
+    Regs.SR = 0x30;
     Regs.PC = MemReadWord (0xFFFC);
 }
 
@@ -4129,9 +4142,9 @@ unsigned ExecuteInsn (void)
         HaveNMIRequest = 0;
         PUSH (PCH);
         PUSH (PCL);
-        PUSH (Regs.SR);
+        PUSH (Regs.SR & ~BF);
         SET_IF (1);
-        if (CPU != CPU_6502)
+        if (CPU == CPU_65C02)
         {
             SET_DF (0);
         }
@@ -4143,9 +4156,9 @@ unsigned ExecuteInsn (void)
         HaveIRQRequest = 0;
         PUSH (PCH);
         PUSH (PCL);
-        PUSH (Regs.SR);
+        PUSH (Regs.SR & ~BF);
         SET_IF (1);
-        if (CPU != CPU_6502)
+        if (CPU == CPU_65C02)
         {
             SET_DF (0);
         }
