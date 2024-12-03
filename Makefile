@@ -12,5 +12,5 @@ sim65-fixed-test : sim65-test.c cJSON.c sim65-testcase.c 6502-fixed.c
 	$(CC) $(CFLAGS) -DFIX_SIM65=1 $^ -o $@
 
 clean :
-	$(RM) *~ sim65-original-test sim65-fixed-test *.test-out
+	$(RM) *~ sim65-original-test sim65-fixed-test *.test-out test_summary.html
 

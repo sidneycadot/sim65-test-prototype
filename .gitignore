@@ -4,3 +4,4 @@ sim65-fixed-test
 *.json
 *~
 *.test-out
+test_summary.html
