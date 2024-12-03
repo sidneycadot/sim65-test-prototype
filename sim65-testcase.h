@@ -8,6 +8,9 @@
 
 #include <stdint.h>
 
+#define F_TEST_MEMORY     0x00000001
+#define F_TEST_CYCLECOUNT 0x00000002
+
 struct machine_state_type
 {
     uint16_t pc;
@@ -33,6 +36,6 @@ enum sim65_cpu_mode_type {
     SIM65_CPU_6502X
 };
 
-int execute_testcase(struct sim65_testcase_specification_type * testcase, const char * filename, unsigned testcase_index, enum sim65_cpu_mode_type cpu_mode);
+int execute_testcase(struct sim65_testcase_specification_type * testcase, const char * filename, unsigned testcase_index, enum sim65_cpu_mode_type cpu_mode, unsigned test_flags);
 
 #endif
