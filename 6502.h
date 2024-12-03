@@ -64,7 +64,6 @@ struct CPURegs {
     uint8_t     AC;             /* Accumulator */
     uint8_t     XR;             /* X register */
     uint8_t     YR;             /* Y register */
-    uint8_t     ZR;             /* Z register */
     uint8_t     SR;             /* Status register */
     uint8_t     SP;             /* Stackpointer */
     uint16_t    PC;             /* Program counter */
@@ -74,7 +73,6 @@ struct CPURegs {
     unsigned    AC;             /* Accumulator */
     unsigned    XR;             /* X register */
     unsigned    YR;             /* Y register */
-    unsigned    ZR;             /* Z register */
     unsigned    SR;             /* Status register */
     unsigned    SP;             /* Stackpointer */
     unsigned    PC;             /* Program counter */
