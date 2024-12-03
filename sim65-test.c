@@ -131,7 +131,7 @@ static int parse_json_testcase(cJSON * json_testcase, struct sim65_testcase_spec
     return 0;
 }
 
-static int process_json_testcase_array(const char * filename, cJSON * json_testcase_array, enum sim65_cpu_mode_type cpu_mode)
+static int process_json_testcase_array(const char * filename, cJSON * json_testcase_array, enum sim65_cpu_mode_type cpu_mode, unsigned test_flags)
 {
     if (!cJSON_IsArray(json_testcase_array))
     {
@@ -154,7 +154,7 @@ static int process_json_testcase_array(const char * filename, cJSON * json_testc
         }
         else
         {
-            int testcase_result = execute_testcase(&testcase, filename, testcase_index, cpu_mode);
+            int testcase_result = execute_testcase(&testcase, filename, testcase_index, cpu_mode, test_flags);
             if (testcase_result != 0)
             {
                 ++testcase_error;
@@ -168,7 +168,7 @@ static int process_json_testcase_array(const char * filename, cJSON * json_testc
     return 0;
 }
 
-static int process_testcase_file(char * filename, enum sim65_cpu_mode_type cpu_mode)
+static int process_testcase_file(char * filename, enum sim65_cpu_mode_type cpu_mode, unsigned test_flags)
 {
     FILE * f = fopen(filename, "r");
     if (f == NULL)
@@ -230,41 +230,56 @@ static int process_testcase_file(char * filename, enum sim65_cpu_mode_type cpu_m
         return -1; // JSON parse error.
     }
 
-    int result = process_json_testcase_array(filename, json_testcase_array, cpu_mode);
+    int result = process_json_testcase_array(filename, json_testcase_array, cpu_mode, test_flags);
 
     cJSON_Delete(json_testcase_array);
 
     return result;
 }
 
+void print_help(void)
+{
+    puts("Usage: sim65-test [--cpu-mode=<mode>] [FILE]...");
+    puts("");
+    puts("Test the instruction execution code from sim65 using JSON-formatted test cases.");
+    puts("");
+    puts("Each FILE should be a JSON-formatted file specifying a number of test cases,");
+    puts("each describing the effect of the execution of a single instruction.");
+    puts("");
+    puts("Test case files support the JSON-based convention used in the 65x02 project:");
+    puts("");
+    puts("    https://github.com/SingleStepTests/65x02");
+    puts("");
+    puts("The 65x02 test suite can be obtained by cloning the 65x02 Git repository:");
+    puts("");
+    puts("    git clone git@github.com:SingleStepTests/65x02.git");
+    puts("");
+    puts("By default, sim65-test will configure sim65 to simulate a vanilla '6502' CPU.");
+    puts("This can be changed by providing a --cpu-mode=<mode> argument:");
+    puts("");
+    puts("  --cpu-mode=6502      Simulate a vanilla 6502 processor.");
+    puts("  --cpu-mode=6502X     Simulate a 6502X processor.");
+    puts("  --cpu-mode=65C02     Simulate a 65C02 processor.");
+    puts("");}
+
 int main(int argc, char ** argv)
 {
     enum sim65_cpu_mode_type cpu_mode = SIM65_CPU_6502;
+    unsigned test_flags = (F_TEST_CYCLECOUNT | F_TEST_MEMORY); // Enable all tests.
 
     if (argc == 1)
     {
-        puts("Usage: sim65-test [--cpu-mode=<mode>] [FILE]...");
-        puts("");
-        puts("Test the instruction execution code from sim65 using JSON-formatted test cases.");
-        puts("");
-        puts("Each FILE should be a JSON-formatted file specifying a number of test cases,");
-        puts("each describing the effect of the execution of a single instruction.");
-        puts("");
-        puts("Test case files support the JSON-based convention used in the 65x02 project:");
-        puts("");
-        puts("    https://github.com/SingleStepTests/65x02");
-        puts("");
-        puts("The 65x02 test suite can be obtained by cloning the 65x02 Git repository:");
-        puts("");
-        puts("    git clone git@github.com:SingleStepTests/65x02.git");
-        puts("");
-        puts("By default, sim65-test will configure sim65 to simulate a vanilla '6502' CPU.");
-        puts("This can be changed by providing a --cpu-mode=<mode> argument:");
-        puts("");
-        puts("  --cpu-mode=6502      Simulate a vanilla 6502 processor.");
-        puts("  --cpu-mode=65c02     Simulate a 65C02 processor.");
-        puts("  --cpu-mode=6502x     Simulate a 6502X processor.");
-        puts("");
+        print_help();
+        return EXIT_SUCCESS;
+    }
+
+    for (int i = 1; i < argc; ++i)
+    {
+        if (strcmp(argv[i], "-h")==0 || strcmp(argv[i], "--help")==0)
+        {
+            print_help();
+            return EXIT_SUCCESS;
+        }
     }
 
     for (int i = 1; i < argc; ++i)
@@ -273,19 +288,32 @@ int main(int argc, char ** argv)
         {
             cpu_mode = SIM65_CPU_6502;
         }
-        else if (strcmp(argv[i], "--cpu-mode=65c02") == 0)
-        {
-            cpu_mode = SIM65_CPU_65C02;
-        }
-        else if (strcmp(argv[i], "--cpu-mode=6502x") == 0)
+        else if (strcmp(argv[i], "--cpu-mode=6502X") == 0)
         {
             cpu_mode = SIM65_CPU_6502X;
         }
+        else if (strcmp(argv[i], "--cpu-mode=65C02") == 0)
+        {
+            cpu_mode = SIM65_CPU_65C02;
+        }
+        else if(strcmp(argv[i], "--disable-cycle-count-test") == 0)
+        {
+            test_flags &= ~F_TEST_CYCLECOUNT;
+        }
+        else if(strcmp(argv[i], "--disable-memory-test") == 0)
+        {
+            test_flags &= ~F_TEST_MEMORY;
+        }
         else
         {
-            process_testcase_file(argv[i], cpu_mode);
+            int result = process_testcase_file(argv[i], cpu_mode, test_flags);
+            if (result != 0)
+            {
+                printf("Unable to process file: %s\n", argv[i]);
+                return EXIT_FAILURE;
+            }
         }
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }
