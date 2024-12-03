@@ -3,3 +3,4 @@ sim65-fixed-test
 65x02
 *.json
 *~
+*.test-out
