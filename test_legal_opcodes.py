@@ -104,7 +104,7 @@ def main() -> None:
         ("6502X", "65x02/6502/v1"),
         #("65C02", "65x02/rockwell65c02/v1"),
         #("65C02", "65x02/synertek65c02/v1"),
-        #("65C02", "65x02/wdc65c02/v1"),
+        ("65C02", "65x02/wdc65c02/v1"),
     )
     sim65_versions = ("original", "fixed")
 
