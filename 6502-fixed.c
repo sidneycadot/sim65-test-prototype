@@ -678,18 +678,14 @@ static unsigned HaveIRQRequest;
     do {                                                        \
         const uint8_t op = v;                                   \
         const uint8_t OldAC = Regs.AC;                          \
-        const bool OldCF = GET_CF();                            \
-        const uint8_t NewAC = OldAC + op + OldCF;               \
-        const bool NewSF = NewAC >= 0x80;                       \
-        const bool NewOF = ((OldAC >= 0x80) ^ NewSF) &          \
-                           ((op    >= 0x80) ^ NewSF);           \
-        const bool NewZF = NewAC == 0;                          \
-        const bool NewCF = OldAC + op + OldCF >= 0x100;         \
-        Regs.AC = NewAC;                                        \
-        SET_SF(NewSF);                                          \
-        SET_OF(NewOF);                                          \
-        SET_ZF(NewZF);                                          \
-        SET_CF(NewCF);                                          \
+        bool carry = GET_CF();                                  \
+        Regs.AC = OldAC + op + carry;                           \
+        const bool NV = Regs.AC >= 0x80;                        \
+        carry = OldAC + op + carry >= 0x100;                    \
+        SET_SF(NV);                                             \
+        SET_OF(((OldAC >= 0x80) ^ NV) & ((op >= 0x80) ^ NV));   \
+        SET_ZF(Regs.AC == 0);                                   \
+        SET_CF(carry);                                          \
     } while (0)
 
 /* ADC, decimal mode (6502 behavior) */
@@ -697,23 +693,19 @@ static unsigned HaveIRQRequest;
     do {                                                        \
         const uint8_t op = v;                                   \
         const uint8_t OldAC = Regs.AC;                          \
-        const bool OldCF = GET_CF();                            \
-        const uint8_t binary_result = OldAC + op + OldCF;       \
-        const bool NewZF = binary_result == 0;                  \
-        bool carry = OldCF;                                     \
+        bool carry = GET_CF();                                  \
+        const uint8_t binary_result = OldAC + op + carry;       \
         uint8_t low_nibble = (OldAC & 15) + (op & 15) + carry;  \
         if ((carry = low_nibble > 9))                           \
             low_nibble = (low_nibble - 10) & 15;                \
         uint8_t high_nibble = (OldAC >> 4) + (op >> 4) + carry; \
-        const bool NewSF = (high_nibble & 8) != 0;              \
-        const bool NewOF = ((OldAC >= 0x80) ^ NewSF) &          \
-                           ((op    >= 0x80) ^ NewSF);           \
+        const bool NV = (high_nibble & 8) != 0;                 \
         if ((carry = high_nibble > 9))                          \
             high_nibble = (high_nibble - 10) & 15;              \
         Regs.AC = (high_nibble << 4) | low_nibble;              \
-        SET_SF(NewSF);                                          \
-        SET_OF(NewOF);                                          \
-        SET_ZF(NewZF);                                          \
+        SET_SF(NV);                                             \
+        SET_OF(((OldAC >= 0x80) ^ NV) & ((op >= 0x80) ^ NV));   \
+        SET_ZF(binary_result == 0);                             \
         SET_CF(carry);                                          \
     } while (0)
 
