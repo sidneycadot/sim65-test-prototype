@@ -84,7 +84,10 @@ def test_sim65_supported_opcodes(sim65_cpu_variant_and_testcase_directory, sim65
     else:
         raise ValueError()
 
-    result = subprocess.run([executable, f"--cpu-mode={sim65_cpu_variant}", "--disable-cycle-count-test"] + testfiles, capture_output=True, encoding='ascii')
+    extra_args = []
+    #extra_args = ["--disable-cycle-count-test"]
+
+    result = subprocess.run([executable, f"--cpu-mode={sim65_cpu_variant}"] + extra_args + testfiles, capture_output=True, encoding='ascii')
 
     assert result.returncode == 0
     assert len(result.stderr) == 0

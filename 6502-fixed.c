@@ -37,15 +37,15 @@
 /* Known bugs and limitations of the 65C02 simulation:
  * support currently only on the level of 65SC02:
    BBRx, BBSx, RMBx, SMBx, WAI, and STP are unsupported
- * BCD flag handling equals 6502 (unchecked if bug is simulated or wrong for
-   6502)
 */
+
+#include <stdbool.h>
+#include <stdint.h>
 
 #include "memory.h"
 #include "error.h"
 #include "6502.h"
 #include "paravirt.h"
-#include "adc_and_sbc.h"
 
 /*
 
@@ -673,26 +673,94 @@ static unsigned HaveIRQRequest;
     TEST_SF (Regs.AC)
 
 
+/* ADC, binary mode (6502 and 65C02) */
+#define ADC_BINARY_MODE(v)                                      \
+    do {                                                        \
+        const uint8_t op = v;                                   \
+        const uint8_t OldAC = Regs.AC;                          \
+        const bool OldCF = GET_CF();                            \
+        const uint8_t NewAC = OldAC + op + OldCF;               \
+        const bool NewSF = NewAC >= 0x80;                       \
+        const bool NewOF = ((OldAC >= 0x80) ^ NewSF) &          \
+                           ((op    >= 0x80) ^ NewSF);           \
+        const bool NewZF = NewAC == 0;                          \
+        const bool NewCF = OldAC + op + OldCF >= 0x100;         \
+        Regs.AC = NewAC;                                        \
+        SET_SF(NewSF);                                          \
+        SET_OF(NewOF);                                          \
+        SET_ZF(NewZF);                                          \
+        SET_CF(NewCF);                                          \
+    } while (0)
+
+/* ADC, decimal mode (6502 behavior) */
+#define ADC_DECIMAL_MODE_6502(v)                                \
+    do {                                                        \
+        const uint8_t op = v;                                   \
+        const uint8_t OldAC = Regs.AC;                          \
+        const bool OldCF = GET_CF();                            \
+        const uint8_t binary_result = OldAC + op + OldCF;       \
+        const bool NewZF = binary_result == 0;                  \
+        bool carry = OldCF;                                     \
+        uint8_t low_nibble = (OldAC & 15) + (op & 15) + carry;  \
+        if ((carry = low_nibble > 9))                           \
+            low_nibble = (low_nibble - 10) & 15;                \
+        uint8_t high_nibble = (OldAC >> 4) + (op >> 4) + carry; \
+        const bool NewSF = (high_nibble & 8) != 0;              \
+        const bool NewOF = ((OldAC >= 0x80) ^ NewSF) &          \
+                           ((op    >= 0x80) ^ NewSF);           \
+        if ((carry = high_nibble > 9))                          \
+            high_nibble = (high_nibble - 10) & 15;              \
+        Regs.AC = (high_nibble << 4) | low_nibble;              \
+        SET_SF(NewSF);                                          \
+        SET_OF(NewOF);                                          \
+        SET_ZF(NewZF);                                          \
+        SET_CF(carry);                                          \
+    } while (0)
+
+/* ADC, decimal mode (65C02 behavior) */
+#define ADC_DECIMAL_MODE_65C02(v)                               \
+    do {                                                        \
+        const uint8_t op = v;                                   \
+        const uint8_t OldAC = Regs.AC;                          \
+        const bool OldCF = GET_CF();                            \
+        bool carry = OldCF;                                     \
+        uint8_t low_nibble = (OldAC & 15) + (op & 15) + carry;  \
+        if ((carry = low_nibble > 9))                           \
+            low_nibble = (low_nibble - 10) & 15;                \
+        uint8_t high_nibble = (OldAC >> 4) + (op >> 4) + carry; \
+        const bool PrematureSF = (high_nibble & 8) != 0;        \
+        if ((carry = high_nibble > 9))                          \
+            high_nibble = (high_nibble - 10) & 15;              \
+        Regs.AC = (high_nibble << 4) | low_nibble;              \
+        const bool NewZF = Regs.AC == 0;                        \
+        const bool NewSF = Regs.AC >= 0x80;                     \
+        const bool NewOF = ((OldAC >= 0x80) ^ PrematureSF) &    \
+                           ((op    >= 0x80) ^ PrematureSF);     \
+        SET_SF(NewSF);                                          \
+        SET_OF(NewOF);                                          \
+        SET_ZF(NewZF);                                          \
+        SET_CF(carry);                                          \
+        ++Cycles;                                               \
+    } while (0)
+
 /* ADC, 6502 version */
-#define ADC_6502(v)                                                           \
-    do {                                                                      \
-        struct OpResult result = adc_6502(GET_DF(), GET_CF(), Regs.AC, v);    \
-        Regs.AC = result.Accumulator;                                         \
-        SET_SF(result.FlagN);                                                 \
-        SET_OF(result.FlagV);                                                 \
-        SET_ZF(result.FlagZ);                                                 \
-        SET_CF(result.FlagC);                                                 \
+#define ADC_6502(v)                                             \
+    do {                                                        \
+        if (GET_DF()) {                                         \
+            ADC_DECIMAL_MODE_6502(v);                           \
+        } else {                                                \
+            ADC_BINARY_MODE(v);                                 \
+        }                                                       \
     } while (0)
 
 /* ADC, 65C02 version */
 #define ADC_65C02(v)                                                          \
-    do {                                                                      \
-        struct OpResult result = adc_65c02(GET_DF(), GET_CF(), Regs.AC, v);   \
-        Regs.AC = result.Accumulator;                                         \
-        SET_SF(result.FlagN);                                                 \
-        SET_OF(result.FlagV);                                                 \
-        SET_ZF(result.FlagZ);                                                 \
-        SET_CF(result.FlagC);                                                 \
+    do {                                                        \
+        if (GET_DF()) {                                         \
+            ADC_DECIMAL_MODE_65C02(v);                          \
+        } else {                                                \
+            ADC_BINARY_MODE(v);                                 \
+        }                                                       \
     } while (0)
 
 /* branches */
@@ -913,7 +981,7 @@ static unsigned HaveIRQRequest;
             SET_OF ((Val & 0x40) ^ ((Val & 0x20) << 1));        \
         }                                                       \
         Regs.AC = Val;                                          \
-    } while (0);
+    } while (0)
 
 /* ANE */
 /* An "unstable" illegal opcode.
@@ -943,7 +1011,7 @@ static unsigned HaveIRQRequest;
         Regs.XR = tmp;                                          \
         TEST_SF (tmp);                                          \
         TEST_ZF (tmp);                                          \
-    } while (0);
+    } while (0)
 
 /* NOP */
 #define NOP(Val)                                                \
@@ -986,27 +1054,97 @@ static unsigned HaveIRQRequest;
     TEST_SF (Val);                                              \
     TEST_ZF (Val)
 
+/* SBC, binary mode (6502 and 65C02) */
+#define SBC_BINARY_MODE(v)                                      \
+    do {                                                        \
+        const uint8_t op = v;                                   \
+        const uint8_t OldAC = Regs.AC;                          \
+        const bool OldBorrow = !GET_CF();                       \
+        const uint8_t NewAC = OldAC - op - OldBorrow;           \
+        const bool NewSF = NewAC >= 0x80;                       \
+        const bool NewOF = ((OldAC >= 0x80) ^ NewSF) &          \
+                           ((op    <  0x80) ^ NewSF);           \
+        const bool NewZF = NewAC == 0;                          \
+        const bool NewCF = OldAC >= op + OldBorrow;             \
+        Regs.AC = NewAC;                                        \
+        SET_SF(NewSF);                                          \
+        SET_OF(NewOF);                                          \
+        SET_ZF(NewZF);                                          \
+        SET_CF(NewCF);                                          \
+    } while (0)
+
+/* SBC, decimal mode (6502 behavior) */
+#define SBC_DECIMAL_MODE_6502(v)                                \
+    do {                                                        \
+        const uint8_t op = v;                                   \
+        const uint8_t OldAC = Regs.AC;                          \
+        bool borrow = !GET_CF();                                \
+        const uint8_t binary_result = OldAC - op - borrow;      \
+        const bool NewSF = binary_result >= 0x80;               \
+        const bool NewOF = ((OldAC >= 0x80) ^ NewSF) &          \
+                           ((op    <  0x80) ^ NewSF);           \
+        const bool NewZF = binary_result == 0;                  \
+        uint8_t low_nibble = (OldAC & 15) - (op & 15) - borrow; \
+        if ((borrow = low_nibble >= 0x80))                      \
+            low_nibble = (low_nibble + 10) & 15;                \
+        uint8_t high_nibble = (OldAC >> 4) - (op >> 4) - borrow;\
+        if ((borrow = high_nibble >= 0x80))                     \
+            high_nibble = (high_nibble + 10) & 15;              \
+        Regs.AC = (high_nibble << 4) | low_nibble;              \
+        SET_SF(NewSF);                                          \
+        SET_OF(NewOF);                                          \
+        SET_ZF(NewZF);                                          \
+        SET_CF(!borrow);                                        \
+    } while (0)
+
+/* SBC, decimal mode (65C02 behavior) */
+#define SBC_DECIMAL_MODE_65C02(v)                               \
+    do {                                                        \
+        const uint8_t op = v;                                   \
+        const uint8_t OldAC = Regs.AC;                          \
+        bool borrow = !GET_CF();                                \
+        uint8_t low_nibble = (OldAC & 15) - (op & 15) - borrow; \
+        if ((borrow = low_nibble >= 0x80))                      \
+            low_nibble += 10;                                   \
+        const bool low_nibble_still_negative =                  \
+            (low_nibble >= 0x80);                               \
+        low_nibble &= 15;                                       \
+        uint8_t high_nibble = (OldAC >> 4) - (op >> 4) - borrow;\
+        const bool PrematureFlagN = (high_nibble & 8) != 0;     \
+        if ((borrow = high_nibble >= 0x80))                     \
+            high_nibble += 10;                                  \
+        high_nibble -= low_nibble_still_negative;               \
+        high_nibble &= 15;                                      \
+        Regs.AC = (high_nibble << 4) | low_nibble;              \
+        const bool NewSF = Regs.AC >= 0x80;                     \
+        const bool NewOF = ((OldAC >= 0x80) ^ PrematureFlagN) & \
+                           ((op    <  0x80) ^ PrematureFlagN);  \
+        const bool NewZF = Regs.AC == 0x00;                     \
+        SET_SF(NewSF);                                          \
+        SET_OF(NewOF);                                          \
+        SET_ZF(NewZF);                                          \
+        SET_CF(!borrow);                                        \
+        ++Cycles;                                               \
+    } while (0)
 
 /* SBC, 6502 version */
-#define SBC_6502(v)                                                           \
-    do {                                                                      \
-        struct OpResult result = sbc_6502(GET_DF(), GET_CF(), Regs.AC, v);    \
-        Regs.AC = result.Accumulator;                                         \
-        SET_SF(result.FlagN);                                                 \
-        SET_OF(result.FlagV);                                                 \
-        SET_ZF(result.FlagZ);                                                 \
-        SET_CF(result.FlagC);                                                 \
+#define SBC_6502(v)                                             \
+    do {                                                        \
+        if (GET_DF()) {                                         \
+            SBC_DECIMAL_MODE_6502(v);                           \
+        } else {                                                \
+            SBC_BINARY_MODE(v);                                 \
+        }                                                       \
     } while (0)
 
 /* SBC, 65C02 version */
-#define SBC_65C02(v)                                                          \
-    do {                                                                      \
-        struct OpResult result = sbc_65c02(GET_DF(), GET_CF(), Regs.AC, v);   \
-        Regs.AC = result.Accumulator;                                         \
-        SET_SF(result.FlagN);                                                 \
-        SET_OF(result.FlagV);                                                 \
-        SET_ZF(result.FlagZ);                                                 \
-        SET_CF(result.FlagC);                                                 \
+#define SBC_65C02(v)                                            \
+    do {                                                        \
+        if (GET_DF()) {                                         \
+            SBC_DECIMAL_MODE_65C02(v);                          \
+        } else {                                                \
+            SBC_BINARY_MODE(v);                                 \
+        }                                                       \
     } while (0)
 
 
@@ -1850,7 +1988,13 @@ static void OPC_6502_5B (void)
 static void OPC_65C02_5C (void)
 /* Opcode $5C: 'Absolute' 8 cycle NOP */
 {
-    Cycles = 8;
+    /* Note: Rhe correctness of this cycle count is disputed.
+     * http://www.6502.org/tutorials/65c02opcodes.html gives it as 8 cycles, while
+     * the 65x02 testsuite claims it's 4 cycles.
+     * For now, we go with the latter.
+     * TODO: test on real hardware.
+     */
+    Cycles = 4;
     Regs.PC += 3;
 }
 
@@ -2033,8 +2177,8 @@ static void OPC_6502_6C (void)
 static void OPC_65C02_6C (void)
 /* Opcode $6C: JMP (ind) */
 {
-    /* 6502 bug fixed here */
-    Cycles = 5;
+    /* The 6502 bug is fixed on the 65C02, at the cost of an extra cycle. */
+    Cycles = 6;
     Regs.PC = MemReadWord (MemReadWord (Regs.PC+1));
 
     ParaVirtHooks (&Regs);
