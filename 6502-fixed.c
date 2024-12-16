@@ -1968,13 +1968,15 @@ static void OPC_6502_5B (void)
 static void OPC_65C02_5C (void)
 /* Opcode $5C: 'Absolute' 8 cycle NOP */
 {
-    /* Note: Rhe correctness of this cycle count is disputed.
-     * http://www.6502.org/tutorials/65c02opcodes.html gives it as 8 cycles, while
-     * the 65x02 testsuite claims it's 4 cycles.
-     * For now, we go with the latter.
-     * TODO: test on real hardware.
+    /* This instruction takes 8 cycles, as per the following sources:
+     *
+     * - http://www.6502.org/tutorials/65c02opcodes.html
+     * - Tests on a WDC 65C02 in hardware.
+     *
+     * The 65x02 testsuite hower claims that this instruction takes 4 cycles.
+     * See issue: https://github.com/SingleStepTests/65x02/issues/12
      */
-    Cycles = 4;
+    Cycles = 8;
     Regs.PC += 3;
 }
 
