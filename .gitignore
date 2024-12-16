@@ -5,3 +5,5 @@ sim65-fixed-test
 *~
 *.test-out
 test_summary.html
+__pycache__
+
