@@ -1051,18 +1051,13 @@ static unsigned HaveIRQRequest;
     do {                                                        \
         const uint8_t op = v;                                   \
         const uint8_t OldAC = Regs.AC;                          \
-        const bool OldBorrow = !GET_CF();                       \
-        const uint8_t NewAC = OldAC - op - OldBorrow;           \
-        const bool NewSF = NewAC >= 0x80;                       \
-        const bool NewOF = ((OldAC >= 0x80) ^ NewSF) &          \
-                           ((op    <  0x80) ^ NewSF);           \
-        const bool NewZF = NewAC == 0;                          \
-        const bool NewCF = OldAC >= op + OldBorrow;             \
-        Regs.AC = NewAC;                                        \
-        SET_SF(NewSF);                                          \
-        SET_OF(NewOF);                                          \
-        SET_ZF(NewZF);                                          \
-        SET_CF(NewCF);                                          \
+        const bool borrow = !GET_CF();                          \
+        Regs.AC = OldAC - op - borrow;                          \
+        const bool NV = Regs.AC >= 0x80;                        \
+        SET_SF(NV);                                             \
+        SET_OF(((OldAC >= 0x80) ^ NV) & ((op < 0x80) ^ NV));    \
+        SET_ZF(Regs.AC == 0);                                   \
+        SET_CF(OldAC >= op + borrow);                           \
     } while (0)
 
 /* SBC, decimal mode (6502 behavior) */
@@ -1072,10 +1067,7 @@ static unsigned HaveIRQRequest;
         const uint8_t OldAC = Regs.AC;                          \
         bool borrow = !GET_CF();                                \
         const uint8_t binary_result = OldAC - op - borrow;      \
-        const bool NewSF = binary_result >= 0x80;               \
-        const bool NewOF = ((OldAC >= 0x80) ^ NewSF) &          \
-                           ((op    <  0x80) ^ NewSF);           \
-        const bool NewZF = binary_result == 0;                  \
+        const bool NV = binary_result >= 0x80;                  \
         uint8_t low_nibble = (OldAC & 15) - (op & 15) - borrow; \
         if ((borrow = low_nibble >= 0x80))                      \
             low_nibble = (low_nibble + 10) & 15;                \
@@ -1083,9 +1075,9 @@ static unsigned HaveIRQRequest;
         if ((borrow = high_nibble >= 0x80))                     \
             high_nibble = (high_nibble + 10) & 15;              \
         Regs.AC = (high_nibble << 4) | low_nibble;              \
-        SET_SF(NewSF);                                          \
-        SET_OF(NewOF);                                          \
-        SET_ZF(NewZF);                                          \
+        SET_SF(NV);                                             \
+        SET_OF(((OldAC >= 0x80) ^ NV) & ((op < 0x80) ^ NV));    \
+        SET_ZF(binary_result == 0);                             \
         SET_CF(!borrow);                                        \
     } while (0)
 
@@ -1102,19 +1094,15 @@ static unsigned HaveIRQRequest;
             (low_nibble >= 0x80);                               \
         low_nibble &= 15;                                       \
         uint8_t high_nibble = (OldAC >> 4) - (op >> 4) - borrow;\
-        const bool PrematureFlagN = (high_nibble & 8) != 0;     \
+        const bool PN = (high_nibble & 8) != 0;                 \
         if ((borrow = high_nibble >= 0x80))                     \
             high_nibble += 10;                                  \
         high_nibble -= low_nibble_still_negative;               \
         high_nibble &= 15;                                      \
         Regs.AC = (high_nibble << 4) | low_nibble;              \
-        const bool NewSF = Regs.AC >= 0x80;                     \
-        const bool NewOF = ((OldAC >= 0x80) ^ PrematureFlagN) & \
-                           ((op    <  0x80) ^ PrematureFlagN);  \
-        const bool NewZF = Regs.AC == 0x00;                     \
-        SET_SF(NewSF);                                          \
-        SET_OF(NewOF);                                          \
-        SET_ZF(NewZF);                                          \
+        SET_SF(Regs.AC >= 0x80);                                \
+        SET_OF(((OldAC >= 0x80) ^ PN) & ((op < 0x80) ^ PN));    \
+        SET_ZF(Regs.AC == 0x00);                                \
         SET_CF(!borrow);                                        \
         ++Cycles;                                               \
     } while (0)

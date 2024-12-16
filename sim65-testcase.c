@@ -17,98 +17,10 @@
 // We obtain a pointer to it by (ab)using the 'ParaVirtHooks' function.
 static CPURegs * cpu_state_ptr;
 
-// Define memory array.
-// The unsigned char base type is also used in sim65.
-static unsigned char mem[0x10000]; 
-
-static bool sim65_mem_write_byte_address_violation;
-static bool sim65_mem_read_byte_address_violation;
 static bool sim65_reported_error;
 static bool sim65_reported_warning;
 
 /////////////////////////////////////////////////////////////////// start of re-implementation of functions that are called from 6502.c.
-
-#if (FIX_SIM65==1)
-
-void MemWriteByte(uint16_t Addr, uint8_t Val)
-{
-    mem[Addr] = Val;
-}
-
-void MemWriteWord(uint16_t Addr, uint16_t Val)
-{
-    // Same implementation as sim65.
-    MemWriteByte (Addr, Val & 0xFF);
-    MemWriteByte (Addr + 1, Val >> 8);
-}
-
-uint8_t MemReadByte(uint16_t Addr)
-{
-    return mem[Addr];
-}
-
-uint16_t MemReadWord(uint16_t Addr)
-{
-    // Same implementation as sim65.
-    unsigned W = MemReadByte (Addr++);
-    return (W | (MemReadByte (Addr) << 8));
-}
-
-uint16_t MemReadZPWord(uint8_t Addr)
-{
-    // Same implementation as sim65.
-    unsigned W = MemReadByte (Addr++);
-    return (W | (MemReadByte (Addr) << 8));
-}
-
-#else
-
-void MemWriteByte(unsigned Addr, unsigned char Val)
-{
-    if (Addr > 0xffff)
-    {
-        sim65_mem_write_byte_address_violation = true;
-    }
-    else
-    {
-        mem[Addr] = Val;
-    }
-}
-
-void MemWriteWord(unsigned Addr, unsigned Val)
-{
-    // Same implementation as sim65.
-    MemWriteByte (Addr, Val & 0xFF);
-    MemWriteByte (Addr + 1, Val >> 8);
-}
-
-unsigned char MemReadByte(unsigned Addr)
-{
-    if (Addr > 0xffff)
-    {
-        sim65_mem_read_byte_address_violation = true;
-        return 0;
-    }
-    else
-    {
-        return mem[Addr];
-    }
-}
-
-unsigned MemReadWord(unsigned Addr)
-{
-    // Same implementation as sim65.
-    unsigned W = MemReadByte (Addr++);
-    return (W | (MemReadByte (Addr) << 8));
-}
-
-unsigned MemReadZPWord(unsigned char Addr)
-{
-    // Same implementation as sim65.
-    unsigned W = MemReadByte (Addr++);
-    return (W | (MemReadByte (Addr) << 8));
-}
-#endif
 
 void ParaVirtHooks(CPURegs * Regs)
 {
@@ -182,8 +94,6 @@ int execute_testcase(struct sim65_testcase_specification_type * testcase, const 
 
     cpu_state_ptr = NULL;
 
-    sim65_mem_write_byte_address_violation = false;
-    sim65_mem_read_byte_address_violation = false;
     sim65_reported_error = false;
     sim65_reported_warning = false;
 
@@ -191,8 +101,6 @@ int execute_testcase(struct sim65_testcase_specification_type * testcase, const 
 
     // Verify that the JMP instruction didn't do anything naughty.
 
-    assert(sim65_mem_write_byte_address_violation == false);
-    assert(sim65_mem_read_byte_address_violation == false);
     assert(sim65_reported_error == false);
     assert(sim65_reported_warning == false);
 
@@ -212,7 +120,7 @@ int execute_testcase(struct sim65_testcase_specification_type * testcase, const 
     cpu_state_ptr->PC = testcase->initial_state.pc;
 
     // Initialize memory according to the initial (pre-instruction) state specified in the testcase.
-    memcpy(mem, testcase->initial_state.ram, 0x10000);
+    memcpy(Mem, testcase->initial_state.ram, 0x10000);
 
     // Run a single instruction.
     unsigned sim65_cyclecount = ExecuteInsn();
@@ -233,18 +141,6 @@ int execute_testcase(struct sim65_testcase_specification_type * testcase, const 
     {
         printf("[%s:%u (\"%s\")] NOTICE - sim65 reported it encountered the JMP-indirect 6502 bug at address 0x%04x.\n", filename, testcase_index, testcase->name, cpu_state_ptr->PC);
         ++notices_seen;
-    }
-
-    if (sim65_mem_read_byte_address_violation)
-    {
-        printf("[%s:%u (\"%s\")] ERROR - sim65 tried to read memory beyond the last address.\n", filename, testcase_index, testcase->name);
-        ++errors_seen;
-    }
-
-    if (sim65_mem_write_byte_address_violation)
-    {
-        printf("[%s:%u (\"%s\")] ERROR - sim65 tried to write memory beyond the last address.\n", filename, testcase_index, testcase->name);
-        ++errors_seen;
     }
 
     if (cpu_state_ptr->AC != testcase->final_state.a)
@@ -289,15 +185,15 @@ int execute_testcase(struct sim65_testcase_specification_type * testcase, const 
         ++errors_seen;
     }
 
-    if ((test_flags & F_TEST_MEMORY) && memcmp(mem, testcase->final_state.ram, 0x10000) != 0)
+    if ((test_flags & F_TEST_MEMORY) && memcmp(Mem, testcase->final_state.ram, 0x10000) != 0)
     {
         unsigned address;
-        for (address = 0; testcase->final_state.ram[address] == mem[address]; ++address)
+        for (address = 0; testcase->final_state.ram[address] == Mem[address]; ++address)
         {
             // Find first address with a difference.
         }
         printf("[%s:%u (\"%s\")] ERROR - memory check failed: (address 0x%04x: expected 0x%02x, sim65: 0x%02x).\n", filename, testcase_index, testcase->name,
-            address, testcase->final_state.ram[address], mem[address]);
+            address, testcase->final_state.ram[address], Mem[address]);
         ++errors_seen;
     }
 

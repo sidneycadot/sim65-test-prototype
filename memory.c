@@ -33,12 +33,22 @@
 
 
 
-#ifndef MEMORY_H
-#define MEMORY_H
+#include <string.h>
 
-#include <stdint.h>
+#include "memory.h"
 
-extern uint8_t Mem[0x10000];
+
+
+/*****************************************************************************/
+/*                                   Data                                    */
+/*****************************************************************************/
+
+
+
+/* The memory */
+uint8_t Mem[0x10000];
+
+
 
 /*****************************************************************************/
 /*                                   Code                                    */
@@ -46,29 +56,55 @@ extern uint8_t Mem[0x10000];
 
 
 
-void MemWriteByte (uint16_t Addr, uint8_t Val);
+void MemWriteByte (uint16_t Addr, uint8_t Val)
 /* Write a byte to a memory location */
+{
+    Mem[Addr] = Val;
+}
 
-void MemWriteWord (uint16_t Addr, uint16_t Val);
+
+
+void MemWriteWord (uint16_t Addr, uint16_t Val)
 /* Write a word to a memory location */
+{
+    MemWriteByte (Addr, Val & 0xFF);
+    MemWriteByte (Addr + 1, Val >> 8);
+}
 
-uint8_t MemReadByte (uint16_t Addr);
+
+
+uint8_t MemReadByte (uint16_t Addr)
 /* Read a byte from a memory location */
+{
+    return Mem[Addr];
+}
 
-uint16_t MemReadWord (uint16_t Addr);
+
+
+uint16_t MemReadWord (uint16_t Addr)
 /* Read a word from a memory location */
+{
+    uint8_t W = MemReadByte (Addr++);
+    return (W | (MemReadByte (Addr) << 8));
+}
 
-uint16_t MemReadZPWord (uint8_t Addr);
+
+
+uint16_t MemReadZPWord (uint8_t Addr)
 /* Read a word from the zero page. This function differs from MemReadWord in that
 ** the read will always be in the zero page, even in case of an address
 ** overflow.
 */
+{
+    uint8_t W = MemReadByte (Addr++);
+    return (W | (MemReadByte (Addr) << 8));
+}
 
-void MemInit (void);
+
+
+void MemInit (void)
 /* Initialize the memory subsystem */
-
-
-
-/* End of memory.h */
-
-#endif
+{
+    /* Fill memory with illegal opcode */
+    memset (Mem, 0xFF, sizeof (Mem));
+}
