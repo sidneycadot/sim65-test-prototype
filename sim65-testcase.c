@@ -8,14 +8,10 @@
 #include <string.h>
 #include <stdbool.h>
 
-#include "6502.h"
+#include "6502-fixed.h"
 #include "memory.h"
 
 #include "sim65-testcase.h"
-
-// The CPURegs structure is a static variable defined in 6502.c.
-// We obtain a pointer to it by (ab)using the 'ParaVirtHooks' function.
-static CPURegs * cpu_state_ptr;
 
 static bool sim65_reported_error;
 static bool sim65_reported_warning;
@@ -24,8 +20,8 @@ static bool sim65_reported_warning;
 
 void ParaVirtHooks(CPURegs * Regs)
 {
-    // Copy the pointer to the CPU state to our local 'cpu_state_ptr', which we can subsequently use to access the simulated CPU's registers.
-    cpu_state_ptr = Regs;
+    // Our implementation of 'ParaVirtHooks' is a no-op.
+    (void)Regs;
 }
 
 void Error(const char * Format, ...)
@@ -86,38 +82,19 @@ int execute_testcase(struct sim65_testcase_specification_type * testcase, const 
     // Reset the CPU. This will set the PC to the value found in (0xfffc, 0xfffd), which is 0xfffb.
     // There, a "jmp $fffb" instruction will be found.
 
-    Reset();
-
-    // Executing a single instruction, which will be read from 0xfffb.
-    // Since it is a jump instruction, this will trigger a 'ParaVirtHooks' invocation,
-    // which will give us the location of the CPURegs struct used by 6502.c.
-
-    cpu_state_ptr = NULL;
-
     sim65_reported_error = false;
     sim65_reported_warning = false;
 
-    ExecuteInsn(); // Execute the single JMP instruction.
+    // Initialize the sim65 state.
 
-    // Verify that the JMP instruction didn't do anything naughty.
+    Reset();
 
-    assert(sim65_reported_error == false);
-    assert(sim65_reported_warning == false);
-
-    // The JMP instruction handler in 6502.c called our 'ParaVirtHooks' function (defined above),
-    // which set the cpu_state_ptr to point to the 'Regs' static variable in 6502.c.
-    // Verify that this did, indeed, happen.
-
-    assert(cpu_state_ptr != NULL);
-
-    // Initialize the sim65 state from the "initial" state.
-
-    cpu_state_ptr->AC = testcase->initial_state.a;
-    cpu_state_ptr->XR = testcase->initial_state.x;
-    cpu_state_ptr->YR = testcase->initial_state.y;
-    cpu_state_ptr->SR = fix_p_register_value(testcase->initial_state.p);
-    cpu_state_ptr->SP = testcase->initial_state.s;
-    cpu_state_ptr->PC = testcase->initial_state.pc;
+    Regs.AC = testcase->initial_state.a;
+    Regs.XR = testcase->initial_state.x;
+    Regs.YR = testcase->initial_state.y;
+    Regs.SR = fix_p_register_value(testcase->initial_state.p);
+    Regs.SP = testcase->initial_state.s;
+    Regs.PC = testcase->initial_state.pc;
 
     // Initialize memory according to the initial (pre-instruction) state specified in the testcase.
     memcpy(Mem, testcase->initial_state.ram, 0x10000);
@@ -132,50 +109,50 @@ int execute_testcase(struct sim65_testcase_specification_type * testcase, const 
 
     if (sim65_reported_error)
     {
-        printf("[%s:%u (\"%s\")] NOTICE - sim65 reported an illegal instruction at address 0x%04x and tried to halt execution.\n", filename, testcase_index, testcase->name, cpu_state_ptr->PC);
+        printf("[%s:%u (\"%s\")] NOTICE - sim65 reported an illegal instruction at address 0x%04x and tried to halt execution.\n", filename, testcase_index, testcase->name, Regs.PC);
         ++notices_seen;
     }
 
 
     if (sim65_reported_warning)
     {
-        printf("[%s:%u (\"%s\")] NOTICE - sim65 reported it encountered the JMP-indirect 6502 bug at address 0x%04x.\n", filename, testcase_index, testcase->name, cpu_state_ptr->PC);
+        printf("[%s:%u (\"%s\")] NOTICE - sim65 reported it encountered the JMP-indirect 6502 bug at address 0x%04x.\n", filename, testcase_index, testcase->name, Regs.PC);
         ++notices_seen;
     }
 
-    if (cpu_state_ptr->AC != testcase->final_state.a)
+    if (Regs.AC != testcase->final_state.a)
     {
-        printf("[%s:%u (\"%s\")] ERROR - A register check failed (expected: 0x%02x, sim65: 0x%02x).\n", filename, testcase_index, testcase->name, testcase->final_state.a, cpu_state_ptr->AC);
+        printf("[%s:%u (\"%s\")] ERROR - A register check failed (expected: 0x%02x, sim65: 0x%02x).\n", filename, testcase_index, testcase->name, testcase->final_state.a, Regs.AC);
         ++errors_seen;
     }
 
-    if (cpu_state_ptr->XR != testcase->final_state.x)
+    if (Regs.XR != testcase->final_state.x)
     {
-        printf("[%s:%u (\"%s\")] ERROR - X register check failed (expected: 0x%02x, sim65: 0x%02x).\n", filename, testcase_index, testcase->name, testcase->final_state.a, cpu_state_ptr->XR);
+        printf("[%s:%u (\"%s\")] ERROR - X register check failed (expected: 0x%02x, sim65: 0x%02x).\n", filename, testcase_index, testcase->name, testcase->final_state.a, Regs.XR);
         ++errors_seen;
     }
 
-    if (cpu_state_ptr->YR != testcase->final_state.y)
+    if (Regs.YR != testcase->final_state.y)
     {
-        printf("[%s:%u (\"%s\")] ERROR - Y register check failed (expected: 0x%02x, sim65: 0x%02x).\n", filename, testcase_index, testcase->name, testcase->final_state.a, cpu_state_ptr->YR);
+        printf("[%s:%u (\"%s\")] ERROR - Y register check failed (expected: 0x%02x, sim65: 0x%02x).\n", filename, testcase_index, testcase->name, testcase->final_state.a, Regs.YR);
         ++errors_seen;
     }
 
-    if (cpu_state_ptr->SR != fix_p_register_value(testcase->final_state.p))
+    if (Regs.SR != fix_p_register_value(testcase->final_state.p))
     {
-        printf("[%s:%u (\"%s\")] ERROR - P register check failed (expected: 0x%02x, sim65: 0x%02x).\n", filename, testcase_index, testcase->name, testcase->final_state.p, cpu_state_ptr->SR);
+        printf("[%s:%u (\"%s\")] ERROR - P register check failed (expected: 0x%02x, sim65: 0x%02x).\n", filename, testcase_index, testcase->name, testcase->final_state.p, Regs.SR);
         ++errors_seen;
     }
 
-    if (cpu_state_ptr->SP != testcase->final_state.s)
+    if (Regs.SP != testcase->final_state.s)
     {
-        printf("[%s:%u (\"%s\")] ERROR - S register check failed (expected: 0x%02x, sim65: 0x%02x).\n", filename, testcase_index, testcase->name, testcase->final_state.s, cpu_state_ptr->SP);
+        printf("[%s:%u (\"%s\")] ERROR - S register check failed (expected: 0x%02x, sim65: 0x%02x).\n", filename, testcase_index, testcase->name, testcase->final_state.s, Regs.SP);
         ++errors_seen;
     }
 
-    if (cpu_state_ptr->PC != testcase->final_state.pc)
+    if (Regs.PC != testcase->final_state.pc)
     {
-        printf("[%s:%u (\"%s\")] ERROR - PC register check failed (expected: 0x%04x, sim65: 0x%04x).\n", filename, testcase_index, testcase->name, testcase->final_state.s, cpu_state_ptr->PC);
+        printf("[%s:%u (\"%s\")] ERROR - PC register check failed (expected: 0x%04x, sim65: 0x%04x).\n", filename, testcase_index, testcase->name, testcase->final_state.s, Regs.PC);
         ++errors_seen;
     }
 

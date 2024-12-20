@@ -44,7 +44,7 @@
 
 #include "memory.h"
 #include "error.h"
-#include "6502.h"
+#include "6502-fixed.h"
 #include "paravirt.h"
 
 /*
@@ -392,7 +392,7 @@ CPUType CPU;
 typedef void (*OPFunc) (void);
 
 /* The CPU registers */
-static CPURegs Regs;
+CPURegs Regs;
 
 /* Cycles for the current insn */
 static unsigned Cycles;
@@ -557,8 +557,8 @@ static unsigned HaveIRQRequest;
 #define ALU_OP_IMM(op)                                          \
     do {                                                        \
         uint8_t immediate;                                      \
-        MEM_AD_OP_IMM(immediate);                               \
-        Cycles = 2;                                             \
+    MEM_AD_OP_IMM(immediate);                                   \
+    Cycles = 2;                                                 \
         op (immediate);                                         \
     } while (0)
 
@@ -567,8 +567,8 @@ static unsigned HaveIRQRequest;
     do {                                                        \
         uint16_t address;                                       \
         uint8_t operand;                                        \
-        Cycles = ALU_CY_##mode;                                 \
-        MEM_AD_OP (mode, address, operand);                     \
+    Cycles = ALU_CY_##mode;                                     \
+    MEM_AD_OP (mode, address, operand);                         \
         op (operand);                                           \
     } while (0)
 
@@ -976,9 +976,11 @@ static unsigned HaveIRQRequest;
     } while (0)
 
 /* ANE */
-/* An "unstable" illegal opcode.
- * Original sim65 behavior is to use the constant EF here.
- * To get behavior in line with the 65x02 testsuite, use constant value 0xEE instead.
+/* An "unstable" illegal opcode that depends on a "constant" value that isn't
+ * really constant. It varies between machines, with temperature, and so on.
+ * Original sim65 behavior was to use the constant 0xEF here. To get behavior
+ * in line with the 65x02 testsuite, we now use the value 0xEE instead,
+ * which is also a reasonable choice that can be observed in practice.
  */
 #define ANE(Val)                                                \
     Val = (Regs.AC | 0xEE) & Regs.XR & Val;                     \
@@ -1126,6 +1128,7 @@ static unsigned HaveIRQRequest;
             SBC_BINARY_MODE(v);                                 \
         }                                                       \
     } while (0)
+
 
 
 /*****************************************************************************/
@@ -1472,14 +1475,24 @@ static void OPC_6502_1F (void)
 static void OPC_6502_20 (void)
 /* Opcode $20: JSR */
 {
-    /* There is a non-obvious case that needs to be handled here.
-     * The pushing of the return address can interfere with the reading of the
-     * destination address, if the JMP target is located, wholly or in part,
-     * inside the stack page (!?!). This won't happen in normal code but it can
-     * happen in specifically constructed examples.
+    /* The obvious way to implement JSR for the 6502 is to (a) read the target address,
+     * and then (b) push the return address minus one. Or do (b) first, then (a).
+     *
+     * However, there is a non-obvious case where this conflicts with the actual order
+     * of operations that the 6502 does, which is:
+     *
+     * (a) Load the LSB of the target address.
+     * (b) Push the MSB of the return address, minus one.
+     * (c) Push the LSB of the return address, minus one.
+     * (d) Load the MSB of the target address.
+     *
+     * This can make a difference in a pretty esoteric case, if the JSR target is located,
+     * wholly or in part, inside the stack page (!). This won't happen in normal code
+     * but it can happen in specifically constructed examples.
      *
      * To deal with this, we load the LSB and MSB of the target address separately,
-     * alternated with the pushing of the return address on the stack.
+     * with the pushing of the return address sandwiched in between, to mimic
+     * the order of the bus operations on a real 6502.
      */
 
     unsigned AddrLo, AddrHi;
@@ -1489,8 +1502,9 @@ static void OPC_6502_20 (void)
     AddrLo = MemReadByte(Regs.PC);
     Regs.PC += 1;
     PUSH (PCH);
-    AddrHi = MemReadByte(Regs.PC);
     PUSH (PCL);
+    AddrHi = MemReadByte(Regs.PC);
+
     Regs.PC = AddrLo + (AddrHi << 8);
 
     ParaVirtHooks (&Regs);
@@ -1973,7 +1987,7 @@ static void OPC_65C02_5C (void)
      * - http://www.6502.org/tutorials/65c02opcodes.html
      * - Tests on a WDC 65C02 in hardware.
      *
-     * The 65x02 testsuite hower claims that this instruction takes 4 cycles.
+     * The 65x02 testsuite however claims that this instruction takes 4 cycles.
      * See issue: https://github.com/SingleStepTests/65x02/issues/12
      */
     Cycles = 8;
