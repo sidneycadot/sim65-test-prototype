@@ -585,10 +585,9 @@ static unsigned HaveIRQRequest;
 #define STO_CY_ZPINDY   6
 #define STO_CY_ZPIND    5
 
-#define STO_CY_ZPINDY_NP   STO_CY_ZPINDY
-
-#define STO_CY_ABSX_NP  STO_CY_ABSX
-#define STO_CY_ABSY_NP  STO_CY_ABSY
+#define STO_CY_ABSX_NP    STO_CY_ABSX
+#define STO_CY_ABSY_NP    STO_CY_ABSY
+#define STO_CY_ZPINDY_NP  STO_CY_ZPINDY
 
 /* zp / zp,x / zp,y / abs / abs,x / abs,y / (zp,x) / (zp),y / (zp) */
 #define STO_OP(mode, op)                                        \
@@ -610,13 +609,11 @@ static unsigned HaveIRQRequest;
 /* Execution cycles for R-M-W opcodes */
 #define RMW_CY_ZP       5
 #define RMW_CY_ZPX      6
-#define RMW_CY_ZPY      6
 #define RMW_CY_ABS      6
 #define RMW_CY_ABSX     7
 #define RMW_CY_ABSY     7
-#define RMW_CY_ZPXIND   6
-#define RMW_CY_ZPINDY   5
-#define RMW_CY_ZPIND    5
+#define RMW_CY_ZPXIND   8
+#define RMW_CY_ZPINDY   8
 
 #define RMW_CY_ABSX_NP      RMW_CY_ABSX
 #define RMW_CY_ABSY_NP      RMW_CY_ABSY
@@ -633,14 +630,17 @@ static unsigned HaveIRQRequest;
 /* 2 x Read-Modify-Write opcode helpers (illegal opcodes) */
 
 /* Execution cycles for 2 x R-M-W opcodes */
-#define RMW2_CY_ZP       5
-#define RMW2_CY_ZPX      6
-#define RMW2_CY_ZPY      6
-#define RMW2_CY_ABS      6
-#define RMW2_CY_ABSX     7
-#define RMW2_CY_ABSY     7
-#define RMW2_CY_ZPXIND   8
-#define RMW2_CY_ZPINDY   8
+#define RMW2_CY_ZP          5
+#define RMW2_CY_ZPX         6
+#define RMW2_CY_ABS         6
+#define RMW2_CY_ABSX        7
+#define RMW2_CY_ABSY        7
+#define RMW2_CY_ZPXIND      8
+#define RMW2_CY_ZPINDY      8
+
+#define RMW2_CY_ZPINDY_NP   RMW2_CY_ZPINDY
+#define RMW2_CY_ABSY_NP     RMW2_CY_ABSY
+#define RMW2_CY_ABSX_NP     RMW2_CY_ABSX
 
 /* zp / zp,x / zp,y / abs / abs,x / abs,y / (zp,x) / (zp),y */
 #define ILLx2_OP(mode, op)                                      \
@@ -1381,7 +1381,7 @@ static void OPC_65SC02_12 (void)
 static void OPC_6502_13 (void)
 /* Opcode $03: SLO (zp),y */
 {
-    ILLx2_OP (ZPINDY, SLO);
+    ILLx2_OP (ZPINDY_NP, SLO);
 }
 
 
@@ -1472,7 +1472,7 @@ static void OPC_65SC02_1A (void)
 static void OPC_6502_1B (void)
 /* Opcode $1B: SLO abs,y */
 {
-    ILLx2_OP (ABSY, SLO);
+    ILLx2_OP (ABSY_NP, SLO);
 }
 
 
@@ -1528,7 +1528,7 @@ static void OPC_65C02_1E (void)
 static void OPC_6502_1F (void)
 /* Opcode $1F: SLO abs,x */
 {
-    ILLx2_OP (ABSX, SLO);
+    ILLx2_OP (ABSX_NP, SLO);
 }
 
 
@@ -1735,7 +1735,7 @@ static void OPC_65SC02_32 (void)
 static void OPC_6502_33 (void)
 /* Opcode $33: RLA (zp),y */
 {
-    ILLx2_OP (ZPINDY, RLA);
+    ILLx2_OP (ZPINDY_NP, RLA);
 }
 
 
@@ -1811,7 +1811,7 @@ static void OPC_65SC02_3A (void)
 static void OPC_6502_3B (void)
 /* Opcode $3B: RLA abs,y */
 {
-    ILLx2_OP (ABSY, RLA);
+    ILLx2_OP (ABSY_NP, RLA);
 }
 
 
@@ -1852,7 +1852,7 @@ static void OPC_65C02_3E (void)
 static void OPC_6502_3F (void)
 /* Opcode $3F: RLA abs,x */
 {
-    ILLx2_OP (ABSX, RLA);
+    ILLx2_OP (ABSX_NP, RLA);
 }
 
 
@@ -2032,7 +2032,7 @@ static void OPC_65SC02_52 (void)
 static void OPC_6502_53 (void)
 /* Opcode $43: SRE (zp),y */
 {
-    ILLx2_OP (ZPINDY, SRE);
+    ILLx2_OP (ZPINDY_NP, SRE);
 }
 
 
@@ -2100,7 +2100,7 @@ static void OPC_65SC02_5A (void)
 static void OPC_6502_5B (void)
 /* Opcode $5B: SRE abs,y */
 {
-    ILLx2_OP (ABSY, SRE);
+    ILLx2_OP (ABSY_NP, SRE);
 }
 
 
@@ -2150,7 +2150,7 @@ static void OPC_65C02_5E (void)
 static void OPC_6502_5F (void)
 /* Opcode $5F: SRE abs,x */
 {
-    ILLx2_OP (ABSX, SRE);
+    ILLx2_OP (ABSX_NP, SRE);
 }
 
 
@@ -2400,7 +2400,7 @@ static void OPC_65C02_72 (void)
 static void OPC_6502_73 (void)
 /* Opcode $73: RRA (zp),y */
 {
-    ILLx2_OP (ZPINDY, RRA);
+    ILLx2_OP (ZPINDY_NP, RRA);
 }
 
 
@@ -2492,7 +2492,7 @@ static void OPC_65SC02_7A (void)
 static void OPC_6502_7B (void)
 /* Opcode $7B: RRA abs,y */
 {
-    ILLx2_OP (ABSY, RRA);
+    ILLx2_OP (ABSY_NP, RRA);
 }
 
 
@@ -2547,7 +2547,7 @@ static void OPC_65C02_7E (void)
 static void OPC_6502_7F (void)
 /* Opcode $7F: RRA abs,x */
 {
-    ILLx2_OP (ABSX, RRA);
+    ILLx2_OP (ABSX_NP, RRA);
 }
 
 
@@ -2745,7 +2745,7 @@ static void OPC_65SC02_92 (void)
 static void OPC_6502_93 (void)
 /* Opcode $93: SHA (zp),y */
 {
-    STO_CB (ZPINDY, SHA);
+    STO_CB (ZPINDY_NP, SHA);
 }
 
 
@@ -2823,7 +2823,7 @@ static void OPC_6502_9A (void)
 static void OPC_6502_9B (void)
 /* Opcode $9B: TAS abs,y */
 {
-    STO_CB (ABSY, TAS);
+    STO_CB (ABSY_NP, TAS);
 }
 
 
@@ -2831,7 +2831,7 @@ static void OPC_6502_9B (void)
 static void OPC_6502_9C (void)
 /* Opcode $9D: SHY abs,x */
 {
-    STO_OP (ABSX, Regs.YR & ((address >> 8) + 1));
+    STO_OP (ABSX_NP, Regs.YR & ((address >> 8) + 1));
 }
 
 
@@ -2855,7 +2855,7 @@ static void OPC_6502_9D (void)
 static void OPC_6502_9E (void)
 /* Opcode $9E: SHX abs,x */
 {
-    STO_OP (ABSY, Regs.XR & ((address >> 8) + 1));
+    STO_OP (ABSY_NP, Regs.XR & ((address >> 8) + 1));
 }
 
 
@@ -2871,7 +2871,7 @@ static void OPC_65SC02_9E (void)
 static void OPC_6502_9F (void)
 /* Opcode $9F: SHA abs,y */
 {
-    STO_CB (ABSY, SHA);
+    STO_CB (ABSY_NP, SHA);
 }
 
 
@@ -3353,7 +3353,7 @@ static void OPC_65SC02_D2 (void)
 static void OPC_6502_D3 (void)
 /* Opcode $D3: DCP (zp),y */
 {
-    MEM_OP (ZPINDY, DCP);
+    MEM_OP (ZPINDY_NP, DCP);
 }
 
 
@@ -3421,7 +3421,7 @@ static void OPC_65SC02_DA (void)
 static void OPC_6502_DB (void)
 /* Opcode $DB: DCP abs,y */
 {
-    MEM_OP (ABSY, DCP);
+    MEM_OP (ABSY_NP, DCP);
 }
 
 
@@ -3445,7 +3445,7 @@ static void OPC_6502_DE (void)
 static void OPC_6502_DF (void)
 /* Opcode $DF: DCP abs,x */
 {
-    MEM_OP (ABSX, DCP);
+    MEM_OP (ABSX_NP, DCP);
 }
 
 
@@ -3701,7 +3701,7 @@ static void OPC_65C02_F2 (void)
 static void OPC_6502_F3 (void)
 /* Opcode $F3: ISC (zp),y */
 {
-    MEM_OP (ZPINDY, ISC);
+    MEM_OP (ZPINDY_NP, ISC);
 }
 
 
@@ -3787,7 +3787,7 @@ static void OPC_65SC02_FA (void)
 static void OPC_6502_FB (void)
 /* Opcode $FB: ISC abs,y */
 {
-    MEM_OP (ABSY, ISC);
+    MEM_OP (ABSY_NP, ISC);
 }
 
 
@@ -3819,7 +3819,7 @@ static void OPC_6502_FE (void)
 static void OPC_6502_FF (void)
 /* Opcode $FF: ISC abs,x */
 {
-    MEM_OP (ABSX, ISC);
+    MEM_OP (ABSX_NP, ISC);
 }
 
 
