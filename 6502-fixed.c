@@ -2745,7 +2745,20 @@ static void OPC_65SC02_92 (void)
 static void OPC_6502_93 (void)
 /* Opcode $93: SHA (zp),y */
 {
-    STO_CB (ZPINDY_NP, SHA);
+    ++Regs.PC;
+    uint8_t zp_ptr_lo = MemReadByte(Regs.PC);
+    ++Regs.PC;
+    uint8_t zp_ptr_hi = zp_ptr_lo + 1;
+    uint8_t baselo = MemReadByte(zp_ptr_lo);
+    uint8_t basehi = MemReadByte(zp_ptr_hi);
+    uint8_t basehi_incremented = basehi + 1;
+    uint8_t write_value = Regs.AC & Regs.XR & basehi_incremented;
+    uint8_t write_address_lo = (baselo + Regs.YR);
+    bool pagecross = (baselo + Regs.YR) > 0xff;
+    uint8_t write_address_hi = pagecross ? write_value : basehi;
+    uint16_t write_address = write_address_lo + (write_address_hi << 8);
+    MemWriteByte(write_address, write_value);
+    Cycles=6;
 }
 
 
@@ -2823,7 +2836,20 @@ static void OPC_6502_9A (void)
 static void OPC_6502_9B (void)
 /* Opcode $9B: TAS abs,y */
 {
-    STO_CB (ABSY_NP, TAS);
+    ++Regs.PC;
+    uint8_t baselo = MemReadByte(Regs.PC);
+    ++Regs.PC;
+    uint8_t basehi = MemReadByte(Regs.PC);
+    ++Regs.PC;
+    uint8_t basehi_incremented = basehi + 1;
+    uint8_t write_value = Regs.AC & Regs.XR & basehi_incremented;
+    uint8_t write_address_lo = (baselo + Regs.YR);
+    bool pagecross = (baselo + Regs.YR) > 0xff;
+    uint8_t write_address_hi = pagecross ? write_value : basehi;
+    uint16_t write_address = write_address_lo + (write_address_hi << 8);
+    MemWriteByte(write_address, write_value);
+    Regs.SP = Regs.AC & Regs.XR;
+    Cycles=5;
 }
 
 
@@ -2831,7 +2857,20 @@ static void OPC_6502_9B (void)
 static void OPC_6502_9C (void)
 /* Opcode $9D: SHY abs,x */
 {
-    STO_OP (ABSX_NP, Regs.YR & ((address >> 8) + 1));
+    //STO_OP (ABSX_NP, Regs.YR & ((address >> 8) + 1));
+    ++Regs.PC;
+    uint8_t baselo = MemReadByte(Regs.PC);
+    ++Regs.PC;
+    uint8_t basehi = MemReadByte(Regs.PC);
+    ++Regs.PC;
+    uint8_t basehi_incremented = basehi + 1;
+    uint8_t write_value = Regs.YR & basehi_incremented;
+    uint8_t write_address_lo = (baselo + Regs.XR);
+    bool pagecross = (baselo + Regs.XR) > 0xff;
+    uint8_t write_address_hi = pagecross ? write_value : basehi;
+    uint16_t write_address = write_address_lo + (write_address_hi << 8);
+    MemWriteByte(write_address, write_value);
+    Cycles=5;
 }
 
 
@@ -2855,7 +2894,19 @@ static void OPC_6502_9D (void)
 static void OPC_6502_9E (void)
 /* Opcode $9E: SHX abs,x */
 {
-    STO_OP (ABSY_NP, Regs.XR & ((address >> 8) + 1));
+    ++Regs.PC;
+    uint8_t baselo = MemReadByte(Regs.PC);
+    ++Regs.PC;
+    uint8_t basehi = MemReadByte(Regs.PC);
+    ++Regs.PC;
+    uint8_t basehi_incremented = basehi + 1;
+    uint8_t write_value = Regs.XR & basehi_incremented;
+    uint8_t write_address_lo = (baselo + Regs.YR);
+    bool pagecross = (baselo + Regs.YR) > 0xff;
+    uint8_t write_address_hi = pagecross ? write_value : basehi;
+    uint16_t write_address = write_address_lo + (write_address_hi << 8);
+    MemWriteByte(write_address, write_value);
+    Cycles=5;
 }
 
 
@@ -2871,7 +2922,19 @@ static void OPC_65SC02_9E (void)
 static void OPC_6502_9F (void)
 /* Opcode $9F: SHA abs,y */
 {
-    STO_CB (ABSY_NP, SHA);
+    ++Regs.PC;
+    uint8_t baselo = MemReadByte(Regs.PC);
+    ++Regs.PC;
+    uint8_t basehi = MemReadByte(Regs.PC);
+    ++Regs.PC;
+    uint8_t basehi_incremented = basehi + 1;
+    uint8_t write_value = Regs.AC & Regs.XR & basehi_incremented;
+    uint8_t write_address_lo = (baselo + Regs.YR);
+    bool pagecross = (baselo + Regs.YR) > 0xff;
+    uint8_t write_address_hi = pagecross ? write_value : basehi;
+    uint16_t write_address = write_address_lo + (write_address_hi << 8);
+    MemWriteByte(write_address, write_value);
+    Cycles=5;
 }
 
 
