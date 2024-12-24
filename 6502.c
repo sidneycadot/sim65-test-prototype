@@ -11,13 +11,13 @@
 /*                D-70794 Filderstadt                                        */
 /* EMail:         uz@cc65.org                                                */
 /*                                                                           */
-/* Mar-2017, Christian Krueger, added support for 65SC02                     */
+/* Mar-2017, Christian Krueger, added support for 65SC02.                    */
 /* Dec-2023, Carlo Bramini, rewritten for better maintenance and added       */
-/*           support for undocumented opcodes for 6502                       */
+/*           support for undocumented opcodes for 6502.                      */
 /* Dec-2024, Sidney Cadot, fixed 65C02 ADC/SBC (decimal mode); implemented   */
 /*           65C02 missing instructions; fixed 6502X illegal instructions;   */
-/*           fixed cycle count for all 6502(X) / 65C02 opcodes.              */
-/*           support for undocumented opcodes for 6502                       */
+/*           fixed cycle count for all 6502(X) / 65C02 opcodes;              */
+/*           achieved full 65x02 test-suite compliance.                      */
 /*                                                                           */
 /* This software is provided 'as-is', without any expressed or implied       */
 /* warranty.  In no event will the authors be held liable for any damages    */
@@ -401,10 +401,10 @@ CPURegs Regs;
 static unsigned Cycles;
 
 /* NMI request active */
-static unsigned HaveNMIRequest;
+static bool HaveNMIRequest;
 
 /* IRQ request active */
-static unsigned HaveIRQRequest;
+static bool HaveIRQRequest;
 
 
 /*****************************************************************************/
@@ -436,7 +436,6 @@ static unsigned HaveIRQRequest;
 */
 #define TEST_ZF(v)      SET_ZF (((v) & 0xFF) == 0)
 #define TEST_SF(v)      SET_SF (((v) & 0x80) != 0)
-#define TEST_CF(v)      SET_CF (((v) & 0xFF00) != 0)
 
 /* Program counter halves */
 #define PCL             (Regs.PC & 0xFF)
@@ -558,7 +557,7 @@ static unsigned HaveIRQRequest;
 
 /* #imm */
 #define ALU_OP_IMM(op)                                          \
-    unsigned char immediate;                                    \
+    uint8_t immediate;                                          \
     MEM_AD_OP_IMM(immediate);                                   \
     Cycles = 2;                                                 \
     op (immediate)
@@ -593,14 +592,6 @@ static unsigned HaveIRQRequest;
     Cycles = STO_CY_##mode;                                     \
     ADR_##mode (address);                                       \
     MemWriteByte(address, op)
-
-/* zp / zp,x / zp,y / abs / abs,x / abs,y / (zp,x) / (zp),y / (zp) */
-#define STO_CB(mode, cb)                                        \
-    unsigned address, operand;                                  \
-    Cycles = STO_CY_##mode;                                     \
-    ADR_##mode (address);                                       \
-    cb (operand);                                               \
-    MemWriteByte(address, operand)
 
 /* Read-Modify-Write opcode helpers */
 
@@ -792,7 +783,7 @@ static unsigned HaveIRQRequest;
 /* ROL */
 #define ROL(Val)                                                \
     do {                                                        \
-        unsigned ShiftOut = (Val & 0x80);                       \
+        bool ShiftOut = (Val & 0x80);                           \
         Val <<= 1;                                              \
         if (GET_CF ()) {                                        \
             Val |= 0x01;                                        \
@@ -805,7 +796,7 @@ static unsigned HaveIRQRequest;
 /* ROR */
 #define ROR(Val)                                                \
     do {                                                        \
-        unsigned ShiftOut = (Val & 0x01);                       \
+        bool ShiftOut = (Val & 0x01);                           \
         Val >>= 1;                                              \
         if (GET_CF ()) {                                        \
             Val |= 0x80;                                        \
@@ -1557,15 +1548,13 @@ static void OPC_6502_20 (void)
      * the order of the bus operations on a real 6502.
      */
 
-    unsigned AddrLo, AddrHi;
-
     Cycles = 6;
     Regs.PC += 1;
-    AddrLo = MemReadByte(Regs.PC);
+    uint8_t AddrLo = MemReadByte(Regs.PC);
     Regs.PC += 1;
     PUSH (PCH);
     PUSH (PCL);
-    AddrHi = MemReadByte(Regs.PC);
+    uint8_t AddrHi = MemReadByte(Regs.PC);
 
     Regs.PC = AddrLo + (AddrHi << 8);
 
@@ -2181,6 +2170,8 @@ static void OPC_65C02_61 (void)
     ALU_OP (ZPXIND, ADC_65C02);
 }
 
+
+
 static void OPC_6502X_63 (void)
 /* Opcode $63: RRA (zp,x) */
 {
@@ -2262,6 +2253,8 @@ static void OPC_65C02_69 (void)
 {
     ALU_OP_IMM (ADC_65C02);
 }
+
+
 
 static void OPC_6502_6A (void)
 /* Opcode $6A: ROR a */
@@ -2419,6 +2412,8 @@ static void OPC_65C02_75 (void)
 {
     ALU_OP (ZPX, ADC_65C02);
 }
+
+
 
 static void OPC_6502_76 (void)
 /* Opcode $76: ROR zp,x */
@@ -3535,6 +3530,8 @@ static void OPC_65C02_E1 (void)
     ALU_OP (ZPXIND, SBC_65C02);
 }
 
+
+
 static void OPC_6502X_E3 (void)
 /* Opcode $E3: ISC (zp,x) */
 {
@@ -3732,7 +3729,6 @@ static void OPC_6502_F1 (void)
 {
     ALU_OP (ZPINDY, SBC_6502);
 }
-
 
 
 
@@ -4697,7 +4693,7 @@ void IRQRequest (void)
 /* Generate an IRQ */
 {
     /* Remember the request */
-    HaveIRQRequest = 1;
+    HaveIRQRequest = true;
 }
 
 
@@ -4706,7 +4702,7 @@ void NMIRequest (void)
 /* Generate an NMI */
 {
     /* Remember the request */
-    HaveNMIRequest = 1;
+    HaveNMIRequest = true;
 }
 
 
@@ -4715,8 +4711,8 @@ void Reset (void)
 /* Generate a CPU RESET */
 {
     /* Reset the CPU */
-    HaveIRQRequest = 0;
-    HaveNMIRequest = 0;
+    HaveIRQRequest = false;
+    HaveNMIRequest = false;
 
     /* Bits 5 and 4 aren't used, and always are 1! */
     Regs.SR = 0x30;
@@ -4760,7 +4756,7 @@ unsigned ExecuteInsn (void)
     } else {
 
         /* Normal instruction - read the next opcode */
-        unsigned char OPC = MemReadByte (Regs.PC);
+        uint8_t OPC = MemReadByte (Regs.PC);
 
         /* Execute it */
         Handlers[CPU][OPC] ();
