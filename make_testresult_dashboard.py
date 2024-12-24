@@ -37,7 +37,7 @@ def parse_file(filename: str):
 
 def render_results_as_table(sim65_cpu_variant, testcase_directory, results, summary, fo):
     with contextlib.redirect_stdout(fo):
-        print(f"    <h1>{sim65_cpu_variant} / {testcase_directory}</h1>")
+        print(f"    <h2>Test results for sim65 with cpu {sim65_cpu_variant!r} and test suite {testcase_directory!r}:</h2>")
         print("    <table border=\"1\" style=\"text-align:center\">")
         for row in range(16):
             print("      <tr>", end='')
@@ -45,7 +45,7 @@ def render_results_as_table(sim65_cpu_variant, testcase_directory, results, summ
                 opcode = f"{row*16+col:02x}"
                 result = results.get(opcode)
                 if result is None:
-                    print("<td style=\"color:lightgray\">illegal</td>", end='')
+                    print("<td style=\"color:lightgray;width:120px\">illegal</td>", end='')
                 else:
                     bad_perc = result.error_count / result.test_count * 100.0
                     if bad_perc==0.0:
@@ -56,10 +56,10 @@ def render_results_as_table(sim65_cpu_variant, testcase_directory, results, summ
                         color="orange"
                     else:
                         color="orangered"
-                    print(f"<td style=\"background-color:{color}\">0x{opcode}:&nbsp;({bad_perc:.2f}%)</td>", end='')
+                    print(f"<td style=\"background-color:{color};width:120px\">0x{opcode}:&nbsp;({bad_perc:.2f}%)</td>", end='')
             print("</tr>")
         print("    </table>")
-        print(f"    <p>In total, {summary.error_count} out of {summary.test_count} tests failed ({summary.error_count/summary.test_count*100.0:.3f}%).</h1>")
+        print(f"    <p>{summary.error_count} out of {summary.test_count} tests failed ({summary.error_count/summary.test_count*100.0:.3f}%).</h1>")
 
 
 def make_testresult_dashboard(sim65_cpu_variants_and_testcase_directories, html_filename: str):
@@ -71,6 +71,7 @@ def make_testresult_dashboard(sim65_cpu_variants_and_testcase_directories, html_
             print("    <title>sim65 results for the 65x02 test suite</title>")
             print("  <head>")
             print("  <body>")
+            print("    <h1>sim65 results for the 65x02 test suite</h1>")
 
         for (sim65_cpu_variant, testcase_directory) in sim65_cpu_variants_and_testcase_directories:
             filename = sim65_cpu_variant + "_" + testcase_directory + ".test-out"
