@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#! /usr/bin/env -S python3 -B
 
 """Test legal/documented opcodes, which are the only ones that sim65 aims to support."""
 
@@ -67,22 +67,15 @@ sim65_supported_opcodes = {
             """
 }
 
-def test_sim65_supported_opcodes(sim65_cpu_variant_and_testcase_directory, sim65_version: str) -> None:
+def test_sim65_supported_opcodes(sim65_cpu_variant, testcase_directory) -> None:
 
-    (sim65_cpu_variant, testcase_directory) = sim65_cpu_variant_and_testcase_directory
-
-    print("Starting test:", sim65_version, sim65_cpu_variant, testcase_directory)
+    print("Starting test:", sim65_cpu_variant, testcase_directory)
 
     sim65_supported_opcodes_for_cpu = sim65_supported_opcodes[sim65_cpu_variant]
 
     testfiles = [os.path.join(testcase_directory, f"{opcode}.json") for opcode in sim65_supported_opcodes_for_cpu.split() if opcode != ".."]
 
-    if sim65_version == "original":
-        executable = "./sim65-original-test"
-    elif sim65_version == "fixed":
-        executable = "./sim65-fixed-test"
-    else:
-        raise ValueError()
+    executable = "./sim65-test"
 
     extra_args = []
     #extra_args = ["--disable-cycle-count-test"]
@@ -92,7 +85,7 @@ def test_sim65_supported_opcodes(sim65_cpu_variant_and_testcase_directory, sim65
     assert result.returncode == 0
     assert len(result.stderr) == 0
 
-    filename = sim65_version + "_" + sim65_cpu_variant + "_" + testcase_directory + ".test-out"
+    filename = sim65_cpu_variant + "_" + testcase_directory + ".test-out"
     filename = filename.replace("/", "-")
 
     print("Writing result file:", filename)
@@ -105,14 +98,13 @@ def main() -> None:
     sim65_cpu_variants_and_testcase_directories = (
         ("6502", "65x02/6502/v1"),
         ("6502X", "65x02/6502/v1"),
-        #("65C02", "65x02/rockwell65c02/v1"),
-        #("65C02", "65x02/synertek65c02/v1"),
-        ("65C02", "65x02/wdc65c02/v1"),
+        #("65C02", "65x02/rockwell65c02/v1"), -- Very close to the WDC.
+        #("65C02", "65x02/synertek65c02/v1"), -- Different for the x7 and xf opcodes.
+        ("65C02", "65x02/wdc65c02/v1")
     )
-    sim65_versions = ("original", "fixed")
 
     pool = multiprocessing.Pool()
-    pool.starmap(test_sim65_supported_opcodes, itertools.product(sim65_cpu_variants_and_testcase_directories, sim65_versions))
+    pool.starmap(test_sim65_supported_opcodes, sim65_cpu_variants_and_testcase_directories)
 
     make_testresult_dashboard(sim65_cpu_variants_and_testcase_directories, "test_summary.html")
 

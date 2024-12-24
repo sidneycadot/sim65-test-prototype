@@ -35,9 +35,9 @@ def parse_file(filename: str):
 
     return (results, summary)
 
-def render_results_as_table(sim65_version, sim65_cpu_variant, testcase_directory, results, summary, fo):
+def render_results_as_table(sim65_cpu_variant, testcase_directory, results, summary, fo):
     with contextlib.redirect_stdout(fo):
-        print(f"    <h1>{sim65_version} / {sim65_cpu_variant} / {testcase_directory}</h1>")
+        print(f"    <h1>{sim65_cpu_variant} / {testcase_directory}</h1>")
         print("    <table border=\"1\" style=\"text-align:center\">")
         for row in range(16):
             print("      <tr>", end='')
@@ -72,20 +72,16 @@ def make_testresult_dashboard(sim65_cpu_variants_and_testcase_directories, html_
             print("  <head>")
             print("  <body>")
 
-        sim65_versions = ("original", "fixed")
-
-        for (sim65_cpu_variant_and_testcase_directory, sim65_version) in itertools.product(sim65_cpu_variants_and_testcase_directories, sim65_versions):
-            (sim65_cpu_variant, testcase_directory) = sim65_cpu_variant_and_testcase_directory
-            filename = sim65_version + "_" + sim65_cpu_variant + "_" + testcase_directory + ".test-out"
+        for (sim65_cpu_variant, testcase_directory) in sim65_cpu_variants_and_testcase_directories:
+            filename = sim65_cpu_variant + "_" + testcase_directory + ".test-out"
             filename = filename.replace("/", "-")
             print(f"Parsing {filename} ...")
             (results, summary) = parse_file(filename)
 
-            render_results_as_table(sim65_version, sim65_cpu_variant, testcase_directory, results, summary, fo)
+            render_results_as_table(sim65_cpu_variant, testcase_directory, results, summary, fo)
 
         with contextlib.redirect_stdout(fo):
             print("  </body>")
             print("</html>")
 
-    print(f"Wrote HTML file: {html_filename}.")
-
+    print(f"Wrote HTML file: {html_filename}")

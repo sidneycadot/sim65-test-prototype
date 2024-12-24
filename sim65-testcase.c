@@ -8,7 +8,7 @@
 #include <string.h>
 #include <stdbool.h>
 
-#include "6502-fixed.h"
+#include "6502.h"
 #include "memory.h"
 
 #include "sim65-testcase.h"
