@@ -362,7 +362,7 @@ ANC #imm     |   2Bh  |  2     |
 -------------+--------+--------+
 
 
-* LAS: calculates the contents of a memory location with the contents of the
+* LAS: calculates the AND of a memory location with the contents of the
 stack pointer register and it stores the result in the accumulator, the X
 register, and the stack pointer.
 
@@ -668,7 +668,7 @@ static bool HaveIRQRequest;
         const uint8_t op = v;                                   \
         const uint8_t OldAC = Regs.AC;                          \
         bool carry = GET_CF();                                  \
-        Regs.AC = (OldAC + op + carry);                         \
+        Regs.AC = OldAC + op + carry;                           \
         const bool NV = Regs.AC >= 0x80;                        \
         carry = OldAC + op + carry >= 0x100;                    \
         SET_SF(NV);                                             \
@@ -735,7 +735,7 @@ static bool HaveIRQRequest;
     } while (0)
 
 /* ADC, 65C02 version */
-#define ADC_65C02(v)                                                          \
+#define ADC_65C02(v)                                            \
     do {                                                        \
         if (GET_DF()) {                                         \
             ADC_DECIMAL_MODE_65C02(v);                          \
@@ -746,21 +746,23 @@ static bool HaveIRQRequest;
 
 /* branches */
 #define BRANCH(cond)                                            \
-    Cycles = 2;                                                 \
-    if (cond) {                                                 \
-        signed char Offs;                                       \
-        unsigned char OldPCH;                                   \
-        ++Cycles;                                               \
-        Offs = (signed char) MemReadByte (Regs.PC+1);           \
-        Regs.PC += 2;                                           \
-        OldPCH = PCH;                                           \
-        Regs.PC = (Regs.PC + (int) Offs) & 0xFFFF;              \
-        if (PCH != OldPCH) {                                    \
+    do {                                                        \
+        Cycles = 2;                                             \
+        if (cond) {                                             \
+            int8_t Offs;                                        \
+            uint8_t OldPCH;                                     \
             ++Cycles;                                           \
+            Offs = MemReadByte (Regs.PC+1);                     \
+            Regs.PC += 2;                                       \
+            OldPCH = PCH;                                       \
+            Regs.PC = (Regs.PC + (int) Offs) & 0xFFFF;          \
+            if (PCH != OldPCH) {                                \
+                ++Cycles;                                       \
+            }                                                   \
+        } else {                                                \
+            Regs.PC += 2;                                       \
         }                                                       \
-    } else {                                                    \
-        Regs.PC += 2;                                           \
-    }
+    } while (0)
 
 /* compares */
 #define COMPARE(v1, v2)                                         \
@@ -783,7 +785,7 @@ static bool HaveIRQRequest;
 /* ROL */
 #define ROL(Val)                                                \
     do {                                                        \
-        bool ShiftOut = (Val & 0x80);                           \
+        const bool ShiftOut = (Val & 0x80) != 0;                \
         Val <<= 1;                                              \
         if (GET_CF ()) {                                        \
             Val |= 0x01;                                        \
@@ -796,7 +798,7 @@ static bool HaveIRQRequest;
 /* ROR */
 #define ROR(Val)                                                \
     do {                                                        \
-        bool ShiftOut = (Val & 0x01);                           \
+        const bool ShiftOut = (Val & 0x01) != 0;                \
         Val >>= 1;                                              \
         if (GET_CF ()) {                                        \
             Val |= 0x80;                                        \
@@ -1034,7 +1036,7 @@ static bool HaveIRQRequest;
         const uint8_t op = v;                                   \
         const uint8_t OldAC = Regs.AC;                          \
         const bool borrow = !GET_CF();                          \
-        Regs.AC = (OldAC - op - borrow);                        \
+        Regs.AC = OldAC - op - borrow;                          \
         const bool NV = Regs.AC >= 0x80;                        \
         SET_SF(NV);                                             \
         SET_OF(((OldAC >= 0x80) ^ NV) & ((op < 0x80) ^ NV));    \
@@ -1116,7 +1118,7 @@ static bool HaveIRQRequest;
  */
 #define ZP_BITOP(bitnr, bitval)                                 \
     do {                                                        \
-        uint8_t zp_address = MemReadByte (Regs.PC + 1);         \
+        const uint8_t zp_address = MemReadByte (Regs.PC + 1);   \
         uint8_t zp_value = MemReadByte (zp_address);            \
         if (bitval) {                                           \
             zp_value |= (1 << bitnr);                           \
@@ -1134,9 +1136,9 @@ static bool HaveIRQRequest;
  */
 #define ZP_BIT_BRANCH(bitnr, bitval)                            \
     do {                                                        \
-        uint8_t zp_address = MemReadByte (Regs.PC + 1);         \
-        uint8_t zp_value = MemReadByte (zp_address);            \
-        int displacement = (int8_t)MemReadByte (Regs.PC + 2);   \
+        const uint8_t zp_address = MemReadByte (Regs.PC + 1);   \
+        const uint8_t zp_value = MemReadByte (zp_address);      \
+        const int8_t displacement = MemReadByte (Regs.PC + 2);  \
         if (((zp_value & (1 << bitnr)) != 0) == bitval) {       \
             Regs.PC += 3;                                       \
             uint8_t OldPCH = PCH;                               \
@@ -4727,7 +4729,7 @@ unsigned ExecuteInsn (void)
     /* If we have an NMI request, handle it */
     if (HaveNMIRequest) {
 
-        HaveNMIRequest = 0;
+        HaveNMIRequest = false;
         PUSH (PCH);
         PUSH (PCL);
         PUSH (Regs.SR & ~BF);
@@ -4741,7 +4743,7 @@ unsigned ExecuteInsn (void)
 
     } else if (HaveIRQRequest && GET_IF () == 0) {
 
-        HaveIRQRequest = 0;
+        HaveIRQRequest = false;
         PUSH (PCH);
         PUSH (PCL);
         PUSH (Regs.SR & ~BF);
@@ -4762,6 +4764,6 @@ unsigned ExecuteInsn (void)
         Handlers[CPU][OPC] ();
     }
 
-    /* Return the number of clock cycles needed by this insn */
+    /* Return the number of clock cycles needed by this instruction */
     return Cycles;
 }
