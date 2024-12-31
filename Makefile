@@ -3,7 +3,7 @@
 
 CFLAGS = -W -Wall -O3
 
-sim65-test : sim65-test.c cJSON.c sim65-testcase.c 6502.c memory.c
+sim65-test : sim65-test.c cJSON.c sim65-testcase.c 6502.c memory.c peripherals.c
 	$(CC) $(CFLAGS) $^ -o $@
 
 clean :
